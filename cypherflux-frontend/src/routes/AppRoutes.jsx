@@ -6,7 +6,7 @@ import Scan from '../pages/Scan';
 import Monitor from '../pages/Monitor';
 import Alerts from '../pages/Alerts';
 import Logs from '../pages/logs';
-import BlockedIPs from '../pages/BlockedIPs';
+import BlockedIPs from '../pages/BlockedIps';
 import { useAuth } from '../context/AuthContext';
 
 const PrivateRoute = ({ children }) => {

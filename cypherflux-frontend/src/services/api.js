@@ -1,6 +1,3 @@
-import axios from 'react'; # Oops, I mean import axios from 'axios'
-
-// Wait, I will fix this in the code content
 import axios from 'axios';
 
 const api = axios.create({
