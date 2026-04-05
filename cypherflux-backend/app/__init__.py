@@ -3,6 +3,7 @@ from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 from app.config import Config
 from app.models.db import db
+from app.models.token_blocklist_model import TokenBlocklist
 
 def create_app():
     app = Flask(__name__)
@@ -11,7 +12,18 @@ def create_app():
     # Initialize Extensions
     db.init_app(app)
     CORS(app)
-    JWTManager(app)
+
+    jwt = JWTManager(app)
+
+    @jwt.token_in_blocklist_loader
+    def _is_token_revoked(_jwt_header, jwt_payload):
+        jti = jwt_payload.get('jti')
+        if not jti:
+            return True
+        return TokenBlocklist.query.filter_by(jti=jti).first() is not None
+    # Register Global Security Middleware Firewall
+    from app.middleware.auth_middleware import setup_middleware
+    setup_middleware(app)
     
     # Register Blueprints
     from app.routes.auth_routes import auth_bp

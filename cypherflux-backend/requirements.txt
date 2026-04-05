@@ -7,3 +7,10 @@ cryptography==41.0.7
 # psycopg2-binary==2.9.9  # Commented out to prevent pg_config build errors on Windows
 Werkzeug==3.0.1
 sqlalchemy>=2.0.32
+
+# Password hashing
+bcrypt>=4.1.2
+
+# Postgres SQL Support & Environment Variables
+psycopg[binary]>=3.1.18
+python-dotenv>=1.0.0

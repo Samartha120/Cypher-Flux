@@ -1,6 +1,8 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import Login from '../pages/login';
+import Signup from '../pages/Signup';
+import VerifyOtp from '../pages/VerifyOtp';
 import Dashboard from '../pages/Dashboard';
 import Scan from '../pages/Scan';
 import Monitor from '../pages/Monitor';
@@ -18,6 +20,8 @@ const AppRoutes = () => {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/signup" element={<Signup />} />
+      <Route path="/verify" element={<VerifyOtp />} />
       <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
       <Route path="/scan" element={<PrivateRoute><Scan /></PrivateRoute>} />
       <Route path="/monitor" element={<PrivateRoute><Monitor /></PrivateRoute>} />

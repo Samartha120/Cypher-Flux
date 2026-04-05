@@ -12,6 +12,9 @@ yarn-error.log*
 .env.test.local
 .env.production.local
 
+# Backend secrets (explicit)
+cypherflux-backend/.env
+
 # Python / Flask
 __pycache__/
 *.py[cod]

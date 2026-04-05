@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
-import { Shield, Server, Radiotower, AlertTriangle } from 'lucide-react';
+import { Shield, Server, RadioTower, AlertTriangle } from 'lucide-react';
 
 const Dashboard = () => {
   const [stats, setStats] = useState({
@@ -42,7 +42,7 @@ const Dashboard = () => {
           </div>
         </div>
         <div className="glass-card stat-card">
-          <Radiotower size={32} className="card-icon green-glow" />
+          <RadioTower size={32} className="card-icon green-glow" />
           <div className="stat-info">
             <h3>OPEN PORTS</h3>
             <p className="stat-val">{stats.openPorts}</p>
