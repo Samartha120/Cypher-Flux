@@ -5,18 +5,18 @@ import { useAuth } from '../context/AuthContext';
 import '../styles/login.css';
 
 const OTP_LENGTH = 6;
-const INITIAL_SECONDS = 5 * 60;
+const INITIAL_SECONDS = 30;
 
 const VerifyOtp = () => {
   const { state } = useLocation();
   const navigate = useNavigate();
   const { sendOtp, verifyOtp } = useAuth();
 
-  const initialEmail = useMemo(() => {
-    return state?.email || localStorage.getItem('pendingEmail') || '';
-  }, [state?.email]);
+  const initialUsername = useMemo(() => {
+    return state?.username || localStorage.getItem('pendingUsername') || '';
+  }, [state?.username]);
 
-  const [email, setEmail] = useState(initialEmail);
+  const [username, setUsername] = useState(initialUsername);
   const [digits, setDigits] = useState(Array.from({ length: OTP_LENGTH }, () => ''));
   const [secondsLeft, setSecondsLeft] = useState(INITIAL_SECONDS);
   const [loading, setLoading] = useState(false);
@@ -27,13 +27,13 @@ const VerifyOtp = () => {
   const inputsRef = useRef([]);
 
   useEffect(() => {
-    if (!email) return;
-    localStorage.setItem('pendingEmail', email);
-  }, [email]);
+    if (!username) return;
+    localStorage.setItem('pendingUsername', username);
+  }, [username]);
 
   useEffect(() => {
     setSecondsLeft(INITIAL_SECONDS);
-  }, [email]);
+  }, [username]);
 
   useEffect(() => {
     const t = setInterval(() => {
@@ -89,8 +89,8 @@ const VerifyOtp = () => {
     setError('');
     setSuccess('');
 
-    if (!email) {
-      setError('Email is required.');
+    if (!username) {
+      setError('Username is required.');
       return;
     }
     if (otp.length !== OTP_LENGTH) {
@@ -99,7 +99,7 @@ const VerifyOtp = () => {
     }
 
     setLoading(true);
-    const res = await verifyOtp(email, otp);
+    const res = await verifyOtp(username, otp);
     setLoading(false);
 
     if (res.success) {
@@ -114,13 +114,13 @@ const VerifyOtp = () => {
     setError('');
     setSuccess('');
 
-    if (!email) {
-      setError('Email is required to resend.');
+    if (!username) {
+      setError('Username is required to resend.');
       return;
     }
 
     setResending(true);
-    const res = await sendOtp(email);
+    const res = await sendOtp(username);
     setResending(false);
 
     if (res.success) {
@@ -140,7 +140,7 @@ const VerifyOtp = () => {
       <div className="glass-card login-card verify-mode">
         <div className="brand glitched">
           <LockKeyhole size={54} className="neon-text glow-pulse" />
-          <h1 data-text="CipherFlux">CipherFlux</h1>
+          <h1 data-text="CypherFlux">CypherFlux</h1>
           <p className="subtitle">VERIFICATION CODE REQUIRED</p>
         </div>
 
@@ -154,12 +154,12 @@ const VerifyOtp = () => {
 
           <div className="input-group">
             <input
-              type="email"
-              placeholder="Agent ID (Email)"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              type="text"
+              placeholder="Agent ID (Username)"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
               required
-              autoComplete="email"
+              autoComplete="username"
             />
           </div>
 

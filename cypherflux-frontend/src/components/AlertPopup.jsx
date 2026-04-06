@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import api from '../services/api';
-import '../styles/alerts.css';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 const AlertPopup = () => {
-  const [alert, setAlert] = useState(null);
   const [lastId, setLastId] = useState(null);
 
   useEffect(() => {
@@ -12,30 +12,37 @@ const AlertPopup = () => {
         const res = await api.get('/alerts');
         if (res.data.length > 0) {
           const latest = res.data[0];
+          // If we have a new alert that we haven't seen before
           if (latest.id !== lastId && lastId !== null) {
-            setAlert(latest);
-            setTimeout(() => setAlert(null), 5000); // Hide after 5 seconds
+            toast.error(
+                <div>
+                    <strong>SYSTEM COMPROMISE DETECTED</strong><br/>
+                    <span style={{fontSize: '0.8rem'}}>Source: {latest.ip}</span><br/>
+                    <span style={{fontSize: '0.8rem', color: '#facc15'}}>Vector: {latest.type}</span>
+                </div>, 
+                {
+                    position: "bottom-right",
+                    autoClose: 5000,
+                    hideProgressBar: false,
+                    closeOnClick: true,
+                    pauseOnHover: true,
+                    draggable: true,
+                    theme: "dark",
+                }
+            );
           }
           setLastId(latest.id);
         }
-      } catch (err) {}
+      } catch (err) {
+        // Ignore silent polling network drops
+      }
     };
 
     const interval = setInterval(pollAlerts, 5000);
     return () => clearInterval(interval);
   }, [lastId]);
 
-  if (!alert) return null;
-
-  return (
-    <div className="alert-popup glass-card">
-      <span className="alert-icon">⚠️</span>
-      <div className="alert-content">
-        <h4>THREAT DETECTED</h4>
-        <p>High traffic / {alert.type} from <strong className="text-red">{alert.ip}</strong></p>
-      </div>
-    </div>
-  );
+  return <ToastContainer toastStyle={{ background: 'rgba(0,15,30,0.9)', border: '1px solid var(--neon-red)', color: '#fff', fontFamily: 'monospace' }} />;
 };
 
 export default AlertPopup;

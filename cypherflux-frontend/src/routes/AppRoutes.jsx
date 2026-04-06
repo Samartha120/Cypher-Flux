@@ -4,6 +4,7 @@ import Login from '../pages/login';
 import Signup from '../pages/Signup';
 import VerifyOtp from '../pages/VerifyOtp';
 import Dashboard from '../pages/Dashboard';
+import Settings from '../pages/Settings';
 import Scan from '../pages/Scan';
 import Monitor from '../pages/Monitor';
 import Alerts from '../pages/Alerts';
@@ -23,6 +24,7 @@ const AppRoutes = () => {
       <Route path="/signup" element={<Signup />} />
       <Route path="/verify" element={<VerifyOtp />} />
       <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
+      <Route path="/settings" element={<PrivateRoute><Settings /></PrivateRoute>} />
       <Route path="/scan" element={<PrivateRoute><Scan /></PrivateRoute>} />
       <Route path="/monitor" element={<PrivateRoute><Monitor /></PrivateRoute>} />
       <Route path="/alerts" element={<PrivateRoute><Alerts /></PrivateRoute>} />

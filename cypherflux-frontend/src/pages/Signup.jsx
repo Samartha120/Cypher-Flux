@@ -6,7 +6,7 @@ import '../styles/login.css';
 
 const passwordScore = (password) => {
   let score = 0;
-  if (password.length >= 12) score += 1;
+  if (password.length >= 8) score += 1;
   if (/[a-z]/.test(password)) score += 1;
   if (/[A-Z]/.test(password)) score += 1;
   if (/\d/.test(password)) score += 1;
@@ -15,6 +15,7 @@ const passwordScore = (password) => {
 };
 
 const Signup = () => {
+  const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -45,11 +46,11 @@ const Signup = () => {
     }
 
     setLoading(true);
-    const res = await signup(email, password, confirmPassword);
+    const res = await signup(username, email, password, confirmPassword);
     setLoading(false);
 
     if (res.success) {
-      navigate('/verify', { state: { email: res.email || email } });
+      navigate('/verify', { state: { username: res.username || username } });
       return;
     }
 
@@ -67,7 +68,7 @@ const Signup = () => {
       <div className="glass-card login-card">
         <div className="brand glitched">
           <UserPlus size={54} className="neon-text" />
-          <h1 data-text="CipherFlux">CipherFlux</h1>
+          <h1 data-text="CypherFlux">CypherFlux</h1>
           <p className="subtitle">NEW AGENT REGISTRATION</p>
         </div>
 
@@ -76,8 +77,19 @@ const Signup = () => {
         <form onSubmit={handleSignup} className="fade-in">
           <div className="input-group">
             <input
+              type="text"
+              placeholder="Agent ID (Username)"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              required
+              autoComplete="username"
+            />
+          </div>
+
+          <div className="input-group">
+            <input
               type="email"
-              placeholder="Agent ID (Email)"
+              placeholder="Recovery Email (OTP delivery)"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required

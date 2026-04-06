@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import '../styles/login.css';
 
 const Login = () => {
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
@@ -18,11 +18,11 @@ const Login = () => {
     e.preventDefault();
     setLoading(true);
     setError('');
-    const res = await login(email, password);
+    const res = await login(username, password);
     if (res.success) {
       navigate('/dashboard');
-    } else if (res.requiresVerification && res.email) {
-      navigate('/verify', { state: { email: res.email } });
+    } else if (res.requiresVerification && res.username) {
+      navigate('/verify', { state: { username: res.username } });
     } else {
       setError(res.msg);
     }
@@ -38,7 +38,7 @@ const Login = () => {
         
         <div className="brand glitched">
           <ShieldAlert size={54} className="neon-text" />
-          <h1 data-text="CipherFlux">CipherFlux</h1>
+          <h1 data-text="CypherFlux">CypherFlux</h1>
           <p className="subtitle">
             SECURE ACCESS TERMINAL
           </p>
@@ -48,12 +48,12 @@ const Login = () => {
         <form onSubmit={handleLogin} className="fade-in">
           <div className="input-group">
             <input 
-              type="email" 
-              placeholder="Agent ID (Email)" 
-              value={email} 
-              onChange={e => setEmail(e.target.value)} 
+              type="text" 
+              placeholder="Agent ID (Username)" 
+              value={username} 
+              onChange={e => setUsername(e.target.value)} 
               required 
-              autoComplete="email"
+              autoComplete="username"
             />
           </div>
             <div className="input-group password-group">

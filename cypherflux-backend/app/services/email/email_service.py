@@ -20,7 +20,7 @@ def send_otp_email(to_email, otp_code):
     msg['From'] = sender_email
     msg['To'] = to_email
 
-    text = f"Your secure access code is: {otp_code}\nThis code will expire in 5 minutes."
+    text = f"Your secure access code is: {otp_code}\nThis code will expire in 30 seconds."
 
     html = f"""
     <html>
@@ -28,7 +28,7 @@ def send_otp_email(to_email, otp_code):
         <h2 style="letter-spacing: 2px;">CipherFlux Identification Protocol</h2>
         <p>A new access request has been initiated.</p>
         <p style="font-size: 2em; border: 1px solid #00f0ff; display: inline-block; padding: 15px; color: #39ff14; letter-spacing: 5px;">{otp_code}</p>
-        <p style="color: #ff003c;">This secure code will expire in exactly 5 minutes. Do not share it.</p>
+        <p style="color: #ff003c;">This secure code will expire in 30 seconds. Do not share it.</p>
       </body>
     </html>
     """
@@ -42,6 +42,7 @@ def send_otp_email(to_email, otp_code):
         server.login(sender_email, sender_password)
         server.sendmail(sender_email, to_email, msg.as_string())
         server.quit()
+        print(f"[INFO] OTP email sent to {to_email} via {smtp_host}:{smtp_port}")
         return True
     except Exception as e:
         print(f"[ERROR] Failed to send email: {e}")
