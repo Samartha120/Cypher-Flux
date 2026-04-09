@@ -131,3 +131,41 @@ body {
 }
 .mt-4 { margin-top: 24px; }
 .mb-2 { margin-bottom: 12px; }
+
+/* Loader */
+.loader {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--text-muted);
+}
+
+.loader__spinner {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid rgba(0, 240, 255, 0.18);
+  border-top-color: var(--neon-blue);
+  box-shadow: 0 0 12px rgba(0, 240, 255, 0.25);
+  animation: spin 0.8s linear infinite;
+}
+
+.loader__label {
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  font-size: 0.75rem;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Live monitor emphasis */
+.blink {
+  animation: blink 0.9s ease-in-out infinite;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}

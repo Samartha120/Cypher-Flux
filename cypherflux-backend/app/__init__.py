@@ -33,6 +33,8 @@ def create_app():
     from app.routes.alert_routes import alert_bp
     from app.routes.log_routes import log_bp
     from app.routes.block_routes import block_bp
+    from app.routes.notification_routes import notification_bp
+    from app.routes.dashboard_routes import dashboard_bp
     
     app.register_blueprint(auth_bp, url_prefix='/api')
     app.register_blueprint(scan_bp, url_prefix='/api')
@@ -41,5 +43,7 @@ def create_app():
     app.register_blueprint(alert_bp, url_prefix='/api')
     app.register_blueprint(log_bp, url_prefix='/api')
     app.register_blueprint(block_bp, url_prefix='/api')
+    app.register_blueprint(notification_bp, url_prefix='/api')
+    app.register_blueprint(dashboard_bp, url_prefix='/api')
     
     return app

@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { UserPlus, Eye, EyeOff } from 'lucide-react';
+import { Mail, Lock, ShieldCheck, User, ShieldAlert, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import '../styles/login.css';
 
@@ -67,7 +67,7 @@ const Signup = () => {
 
       <div className="glass-card login-card">
         <div className="brand glitched">
-          <UserPlus size={54} className="neon-text" />
+          <ShieldAlert size={54} className="neon-text" />
           <h1 data-text="CypherFlux">CypherFlux</h1>
           <p className="subtitle">NEW AGENT REGISTRATION</p>
         </div>

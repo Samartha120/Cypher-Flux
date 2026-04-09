@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import '../styles/login.css';
 
 const Login = () => {
-  const [username, setUsername] = useState('');
+  const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
@@ -18,7 +18,7 @@ const Login = () => {
     e.preventDefault();
     setLoading(true);
     setError('');
-    const res = await login(username, password);
+    const res = await login(identifier, password);
     if (res.success) {
       navigate('/dashboard');
     } else if (res.requiresVerification && res.username) {
@@ -49,9 +49,9 @@ const Login = () => {
           <div className="input-group">
             <input 
               type="text" 
-              placeholder="Agent ID (Username)" 
-              value={username} 
-              onChange={e => setUsername(e.target.value)} 
+              placeholder="Agent ID or Email Address" 
+              value={identifier} 
+              onChange={e => setIdentifier(e.target.value)} 
               required 
               autoComplete="username"
             />

@@ -1,22 +1,109 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import api from '../services/api';
 import { Activity } from 'lucide-react';
 
+const randomInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+
+const randomIp = () => {
+  const a = randomInt(11, 223);
+  const b = randomInt(0, 255);
+  const c = randomInt(0, 255);
+  const d = randomInt(1, 254);
+  return `${a}.${b}.${c}.${d}`;
+};
+
+const statusForRequests = (requests) => {
+  if (requests > 200) return 'blocked';
+  if (requests > 100) return 'suspicious';
+  return 'normal';
+};
+
 const Monitor = () => {
   const [traffic, setTraffic] = useState([]);
+  const [apiTraffic, setApiTraffic] = useState([]);
+  const [apiAvailable, setApiAvailable] = useState(false);
+  const seededRef = useRef(false);
+  const simIntervalRef = useRef(null);
+  const apiIntervalRef = useRef(null);
+
+  const mergedTraffic = useMemo(() => {
+    const base = apiAvailable ? apiTraffic : traffic;
+    const list = Array.isArray(base) ? base : [];
+    return list
+      .map((row) => {
+        const ip = row?.ip;
+        const requests = Number(row?.requests ?? 0);
+        return {
+          ip,
+          requests,
+          status: statusForRequests(requests),
+          _seed: row?._seed ?? Math.random().toString(16).slice(2),
+        };
+      })
+      .filter((r) => !!r.ip)
+      .sort((a, b) => (b.requests ?? 0) - (a.requests ?? 0))
+      .slice(0, 18);
+  }, [apiAvailable, apiTraffic, traffic]);
 
   useEffect(() => {
+    // Seed simulation once
+    if (!seededRef.current) {
+      seededRef.current = true;
+      const initial = Array.from({ length: 10 }, () => {
+        const requests = randomInt(5, 90);
+        return {
+          ip: randomIp(),
+          requests,
+          status: statusForRequests(requests),
+          _seed: Math.random().toString(16).slice(2),
+        };
+      });
+      setTraffic(initial);
+    }
+
+    // Real-time simulation: update every second with spikes/decay
+    simIntervalRef.current = setInterval(() => {
+      setTraffic((prev) => {
+        const next = prev.map((row) => {
+          const base = Number(row.requests ?? 0);
+          const decay = Math.max(0, Math.floor(base * (Math.random() * 0.12)));
+          const normal = randomInt(0, 14);
+          const spike = Math.random() > 0.93 ? randomInt(60, 180) : 0;
+          const requests = Math.min(320, Math.max(0, base - decay + normal + spike));
+          return { ...row, requests, status: statusForRequests(requests) };
+        });
+
+        // Occasionally introduce a new IP
+        if (next.length < 18 && Math.random() > 0.82) {
+          const requests = randomInt(2, 45);
+          next.push({ ip: randomIp(), requests, status: statusForRequests(requests), _seed: Math.random().toString(16).slice(2) });
+        }
+
+        // Drop cold IPs
+        const filtered = next.filter((r) => (r.requests ?? 0) > 0 || Math.random() > 0.4);
+        return filtered.slice(0, 18);
+      });
+    }, 1000);
+
+    // API overlay: poll every 3s; if backend is running, it will replace matching IPs
     const fetchTraffic = async () => {
       try {
         const res = await api.get('/monitor');
-        setTraffic(res.data);
-      } catch (err) {
-        console.error(err);
+        const data = Array.isArray(res?.data) ? res.data : [];
+        setApiTraffic(data);
+        setApiAvailable(true);
+      } catch {
+        setApiTraffic([]);
+        setApiAvailable(false);
       }
     };
     fetchTraffic();
-    const interval = setInterval(fetchTraffic, 3000);
-    return () => clearInterval(interval);
+    apiIntervalRef.current = setInterval(fetchTraffic, 3000);
+
+    return () => {
+      if (simIntervalRef.current) clearInterval(simIntervalRef.current);
+      if (apiIntervalRef.current) clearInterval(apiIntervalRef.current);
+    };
   }, []);
 
   return (
@@ -35,14 +122,22 @@ const Monitor = () => {
             </tr>
           </thead>
           <tbody>
-            {traffic.length === 0 ? (
+            {mergedTraffic.length === 0 ? (
               <tr><td colSpan="3" style={{textAlign: 'center'}}>No traffic detected recently</td></tr>
-            ) : traffic.map((t, i) => (
-              <tr key={i}>
-                <td>{t.ip}</td>
-                <td className="text-glow">{t.requests}</td>
+            ) : mergedTraffic.map((t) => (
+              <tr key={t?.ip || t?._seed}>
+                <td className={t.status === 'blocked' ? 'text-red' : t.status === 'suspicious' ? '' : ''}>
+                  {t?.ip || '—'}
+                </td>
+                <td className="text-glow">{Number(t?.requests ?? 0)}</td>
                 <td>
-                  {t.requests > 50 ? <span className="text-red">WARNING: DOS Threshold</span> : <span className="text-green">NORMAL</span>}
+                  {t.status === 'blocked' ? (
+                    <span className="text-red" style={{ letterSpacing: '1px', textTransform: 'uppercase' }}>BLOCKED</span>
+                  ) : t.status === 'suspicious' ? (
+                    <span className="blink" style={{ color: '#facc15', letterSpacing: '1px', textTransform: 'uppercase' }}>SUSPICIOUS</span>
+                  ) : (
+                    <span className="text-green" style={{ letterSpacing: '1px', textTransform: 'uppercase' }}>NORMAL</span>
+                  )}
                 </td>
               </tr>
             ))}

@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import jwt_required
 from app.services.scanner.nmap_Scanner import ScannerEngine
+from app.services.scanner.scan_state import set_last_scan
 
 scan_bp = Blueprint('scan', __name__)
 scanner = ScannerEngine()
@@ -11,4 +12,5 @@ def start_scan():
     data = request.get_json() or {}
     target = data.get('target', '127.0.0.1')
     results = scanner.scan_network(target)
+    set_last_scan(target, results)
     return jsonify({"target": target, "devices": results}), 200

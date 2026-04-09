@@ -1,4 +1,5 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
+import { ShieldAlert } from 'lucide-react';
 import api from '../services/api';
 
 const AuthContext = createContext();
@@ -7,6 +8,8 @@ export const AuthProvider = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  const SESSION_START_KEY = 'sessionStart';
 
   const parseJwt = (token) => {
     try {
@@ -25,21 +28,50 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const isTokenValid = (token) => {
+    const decoded = parseJwt(token);
+    const expSeconds = decoded?.exp;
+    if (!expSeconds) return false;
+    return Date.now() < expSeconds * 1000;
+  };
+
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      setIsAuthenticated(true);
-      const decoded = parseJwt(token);
-      setUser(decoded ? { username: decoded.username, email: decoded.email } : null);
-    }
-    setLoading(false);
+    const initAuth = () => {
+      // Force login on fresh website open: token is session-scoped, not persistent.
+      // Also clear any legacy token persisted by older builds.
+      localStorage.removeItem('token');
+
+      const token = sessionStorage.getItem('token');
+      if (token && isTokenValid(token)) {
+        setIsAuthenticated(true);
+        const decoded = parseJwt(token);
+        setUser(decoded ? { username: decoded.username, email: decoded.email } : null);
+
+        // Ensure session start exists for real-time duration display
+        if (!sessionStorage.getItem(SESSION_START_KEY)) {
+          sessionStorage.setItem(SESSION_START_KEY, String(Date.now()));
+        }
+      } else {
+        sessionStorage.removeItem('token');
+        sessionStorage.removeItem(SESSION_START_KEY);
+        setIsAuthenticated(false);
+        setUser(null);
+      }
+      
+      // Enforce a minimum 1.5s visual loader for the CypherFlux project logo popup
+      setTimeout(() => {
+        setLoading(false);
+      }, 1500);
+    };
+    initAuth();
   }, []);
 
-  const login = async (username, password) => {
+  const login = async (identifier, password) => {
     try {
-      const response = await api.post('/login', { username, password });
+      const response = await api.post('/login', { identifier, password });
       if (response.data.access_token) {
-        localStorage.setItem('token', response.data.access_token);
+        sessionStorage.setItem('token', response.data.access_token);
+        sessionStorage.setItem(SESSION_START_KEY, String(Date.now()));
         setIsAuthenticated(true);
         const decoded = parseJwt(response.data.access_token);
         setUser(decoded ? { username: decoded.username, email: decoded.email } : null);
@@ -84,7 +116,8 @@ export const AuthProvider = ({ children }) => {
     try {
       const response = await api.post('/verify-otp', { username, otp });
       if (response.data.access_token) {
-        localStorage.setItem('token', response.data.access_token);
+        sessionStorage.setItem('token', response.data.access_token);
+        sessionStorage.setItem(SESSION_START_KEY, String(Date.now()));
         localStorage.removeItem('pendingUsername');
         setIsAuthenticated(true);
         const decoded = parseJwt(response.data.access_token);
@@ -117,13 +150,24 @@ export const AuthProvider = ({ children }) => {
     } catch {
       // Ignore network errors; local logout still clears session.
     }
+    sessionStorage.removeItem('token');
+    sessionStorage.removeItem(SESSION_START_KEY);
     localStorage.removeItem('token');
     localStorage.removeItem('pendingUsername');
     setIsAuthenticated(false);
     setUser(null);
   };
 
-  if (loading) return null;
+  if (loading) {
+    return (
+      <div style={{ height: '100vh', width: '100vw', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#050a14' }}>
+        <ShieldAlert size={80} color="var(--neon-blue)" style={{ marginBottom: '25px', animation: 'pulse 2s infinite', filter: 'drop-shadow(0 0 15px rgba(0,240,255,0.5))' }} />
+        <h2 className="neon-text" style={{ letterSpacing: '8px', fontSize: '2rem' }}>CYPHERFLUX</h2>
+        <div style={{ width: '200px', height: '2px', background: 'var(--neon-blue)', marginTop: '20px', marginBottom: '20px', animation: 'scanline 2s linear infinite' }}></div>
+        <p style={{ color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '2px', fontSize: '0.8rem' }}>Initializing Secure Terminal...</p>
+      </div>
+    );
+  }
 
   return (
     <AuthContext.Provider value={{ isAuthenticated, user, login, signup, sendOtp, verifyOtp, changePassword, logout }}>

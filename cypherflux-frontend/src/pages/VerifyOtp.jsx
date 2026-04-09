@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Fingerprint, LockKeyhole, RotateCcw } from 'lucide-react';
+import { Fingerprint, ShieldAlert, RotateCcw } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import '../styles/login.css';
 
@@ -139,7 +139,7 @@ const VerifyOtp = () => {
 
       <div className="glass-card login-card verify-mode">
         <div className="brand glitched">
-          <LockKeyhole size={54} className="neon-text glow-pulse" />
+          <ShieldAlert size={54} className="neon-text glow-pulse" />
           <h1 data-text="CypherFlux">CypherFlux</h1>
           <p className="subtitle">VERIFICATION CODE REQUIRED</p>
         </div>

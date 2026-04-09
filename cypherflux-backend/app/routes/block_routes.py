@@ -17,9 +17,25 @@ def add_block():
     data = request.get_json()
     ip = data.get('ip')
     reason = data.get('reason', 'Manual block')
+
+    if not ip:
+        return jsonify({"msg": "IP is required"}), 400
+
+    # Treat 0.0.0.0 as a block-all rule (0.0.0.0/0)
+    if str(ip).strip() == '0.0.0.0':
+        ip = '0.0.0.0/0'
+        if reason == 'Manual block':
+            reason = 'Block all traffic'
     
     if not BlockedIP.query.filter_by(ip=ip).first():
         new_block = BlockedIP(ip=ip, reason=reason)
         db.session.add(new_block)
         db.session.commit()
     return jsonify({"msg": "IP Blocked"}), 201
+
+@block_bp.route('/blocked', methods=['DELETE'])
+@jwt_required()
+def purge_blocked():
+    db.session.query(BlockedIP).delete()
+    db.session.commit()
+    return jsonify({"msg": "All IP blocks forcefully lifted."}), 200

@@ -13,6 +13,7 @@ import secrets
 import hashlib
 from typing import Optional
 from datetime import datetime, timedelta
+from app.services.notifications.notification_service import create_notification
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -104,22 +105,52 @@ def _json_error(message: str, status: int):
 @auth_bp.route('/login', methods=['POST'])
 def login():
     data = request.get_json()
-    username = data.get('username') 
+    identifier = data.get('identifier') or data.get('email') or data.get('username')
     password = data.get('password')
 
-    user = User.query.filter_by(username=username).first()
-    if not username or not USERNAME_REGEX.match(username):
-        return _json_error("Invalid username.", 400)
+    if not identifier:
+        return _json_error("Missing username or email.", 400)
     if not password:
         return _json_error("Missing password.", 400)
 
-    user = User.query.filter_by(username=username).first()
+    if '@' in identifier:
+        ident_norm = _normalize_email(identifier)
+        if not ident_norm or not EMAIL_REGEX.match(ident_norm):
+            return _json_error("Invalid email.", 400)
+        user = User.query.filter_by(email=ident_norm).first()
+    else:
+        ident_norm = _normalize_username(identifier)
+        if not ident_norm or not USERNAME_REGEX.match(ident_norm):
+            return _json_error("Invalid username.", 400)
+        user = User.query.filter_by(username=ident_norm).first()
 
     if not user or not _verify_password(password, user.password_hash):
+        try:
+            create_notification(
+                event_type='auth.login_failed',
+                title='Login Failed',
+                message='Invalid credentials provided.',
+                severity='warning',
+                user_id=user.id if user else None,
+                req=request,
+            )
+        except Exception:
+            pass
         return _json_error("Bad credentials", 401)
 
     if not user.is_verified:
         _generate_and_send_otp(user.email)
+        try:
+            create_notification(
+                event_type='auth.verification_required',
+                title='Verification Required',
+                message='OTP verification required to complete login.',
+                severity='warning',
+                user_id=user.id,
+                req=request,
+            )
+        except Exception:
+            pass
         return jsonify({
             "msg": "Verification required",
             "requires_verification": True,
@@ -128,6 +159,17 @@ def login():
         }), 403
 
     access_token = _issue_token(user)
+    try:
+        create_notification(
+            event_type='auth.login',
+            title='Login Success',
+            message='User authenticated successfully.',
+            severity='success',
+            user_id=user.id,
+            req=request,
+        )
+    except Exception:
+        pass
     return jsonify(access_token=access_token), 200
 
 @auth_bp.route('/signup', methods=['POST'])
@@ -159,6 +201,18 @@ def signup():
     new_user = User(username=username, email=email, password_hash=_hash_password(password), is_verified=False)
     db.session.add(new_user)
     db.session.commit()
+
+    try:
+        create_notification(
+            event_type='auth.signup',
+            title='Account Created',
+            message='New account created. OTP verification required.',
+            severity='info',
+            user_id=new_user.id,
+            req=request,
+        )
+    except Exception:
+        pass
 
     _generate_and_send_otp(email)
     return jsonify({"msg": "Account created. Verification required.", "username": username, "email": email}), 201
@@ -196,6 +250,17 @@ def send_otp():
         return jsonify({"msg": "Account already verified."}), 200
 
     _generate_and_send_otp(user.email)
+    try:
+        create_notification(
+            event_type='auth.otp_sent',
+            title='OTP Sent',
+            message='A verification code was sent to the registered email.',
+            severity='info',
+            user_id=user.id,
+            req=request,
+        )
+    except Exception:
+        pass
     return jsonify({
         "msg": "A fresh OTP has been successfully dispatched.",
         "username": user.username,
@@ -257,6 +322,18 @@ def verify_otp():
     OTPCode.query.filter_by(email=email).delete()
     db.session.commit()
 
+    try:
+        create_notification(
+            event_type='auth.otp_verified',
+            title='OTP Verified',
+            message='Account verification completed successfully.',
+            severity='success',
+            user_id=user.id,
+            req=request,
+        )
+    except Exception:
+        pass
+
     access_token = _issue_token(user)
     return jsonify({"access_token": access_token, "msg": "System access granted"}), 201
 
@@ -293,6 +370,18 @@ def change_password():
 
     user.password_hash = _hash_password(new_password)
     db.session.commit()
+
+    try:
+        create_notification(
+            event_type='auth.password_change',
+            title='Password Changed',
+            message='Password updated successfully.',
+            severity='success',
+            user_id=user.id,
+            req=request,
+        )
+    except Exception:
+        pass
     return jsonify({"msg": "Password updated."}), 200
 
 @auth_bp.route('/logout', methods=['POST'])
@@ -302,4 +391,16 @@ def logout():
     if jti:
         db.session.add(TokenBlocklist(jti=jti))
         db.session.commit()
+    try:
+        user_id = get_jwt_identity()
+        create_notification(
+            event_type='auth.logout',
+            title='Logout',
+            message='User session terminated.',
+            severity='info',
+            user_id=int(user_id) if user_id is not None else None,
+            req=request,
+        )
+    except Exception:
+        pass
     return jsonify({"msg": "Successfully logged out"}), 200
