@@ -107,8 +107,9 @@ const Logs = () => {
       };
     });
 
-    // Prefer API logs when API is reachable; otherwise use sim logs.
-    const list = apiAvailable ? formattedApi : logs;
+    // Prefer API logs when they exist, but keep the simulated feed visible.
+    // This avoids a blank page when the backend is reachable yet has no log rows yet.
+    const list = formattedApi.length > 0 ? [...formattedApi, ...logs] : logs;
     return list.slice(0, 50);
   }, [apiAvailable, apiLogs, logs]);
 

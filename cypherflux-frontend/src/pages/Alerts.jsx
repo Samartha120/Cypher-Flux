@@ -130,7 +130,14 @@ const Alerts = () => {
                 <td>{t?.id || '—'}</td>
                 <td>{t?.timestamp ? new Date(t.timestamp).toLocaleString() : '—'}</td>
                 <td className="text-red">{t?.sourceIp || t?.ip || '—'}</td>
-                <td>{t?.threatType || t?.type || '—'}</td>
+                <td>
+                  {t?.threatType || t?.type || '—'}
+                  {Number(t?.count || 1) > 1 ? (
+                    <span style={{ marginLeft: 8, fontFamily: 'monospace', color: 'var(--neon-blue)', fontWeight: 800 }}>
+                      x{Number(t?.count || 1)}
+                    </span>
+                  ) : null}
+                </td>
                 <td
                   style={{
                     textTransform: 'uppercase',

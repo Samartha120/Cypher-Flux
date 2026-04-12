@@ -50,7 +50,24 @@ const THREAT_CATALOG = [
     severity: 'medium',
     buildMeta: () => ({ domain: pickOne(['update-secure-check.com', 'cdn-auth-verify.net', 'login-confirm.io']) }),
   },
+  // ── LOW severity ──────────────────────────────────────────────────────────
+  {
+    type: 'Unusual Login Time',
+    severity: 'low',
+    buildMeta: () => ({ hour: randomInt(1, 5), user: pickOne(['admin', 'sysop', 'devops', 'analyst']) }),
+  },
+  {
+    type: 'Configuration Change Detected',
+    severity: 'low',
+    buildMeta: () => ({ file: pickOne(['/etc/passwd', '/etc/hosts', 'nginx.conf', 'sshd_config']) }),
+  },
+  {
+    type: 'Failed Authentication Attempt',
+    severity: 'low',
+    buildMeta: () => ({ attempts: randomInt(1, 5), target: pickOne(['SSH', 'WEB', 'VPN']) }),
+  },
 ];
+
 
 const randomPublicIp = () => {
   const a = randomInt(11, 223);
@@ -84,7 +101,9 @@ const randomUuid = () => {
 const severityRiskScore = (severity) => {
   const s = String(severity || '').toLowerCase();
   if (s === 'critical') return randomInt(85, 100);
-  if (s === 'high') return randomInt(60, 84);
+  if (s === 'high')     return randomInt(60, 84);
+  if (s === 'medium')   return randomInt(30, 59);
+  if (s === 'low')      return randomInt(5,  29);
   return randomInt(30, 59);
 };
 

@@ -1,8 +1,8 @@
 import os
-
-from app.models.db import db
-from app.models.alert_model import Alert
 from datetime import datetime, timedelta
+
+from app.models.alert_model import Alert
+from app.services.alerts.alert_aggregator import upsert_alert
 
 def _int_env(name: str, default: int) -> int:
     try:
@@ -41,21 +41,12 @@ class DetectionEngine:
         # 1) Low severity early warning for elevated traffic (pre-threshold)
         pre_alert_threshold = int(max(DOS_THRESHOLD, 1) * PRE_ALERT_RATIO)
         if pre_alert_threshold <= count <= DOS_THRESHOLD:
-            last = (
-                Alert.query.filter_by(ip=ip, type="Elevated Traffic")
-                .order_by(Alert.id.desc())
-                .first()
+            upsert_alert(
+                ip=ip,
+                alert_type="Elevated Traffic",
+                severity="low",
+                details=f"Traffic elevated: {count} hits within 60s window (pre-alert threshold {pre_alert_threshold}/{DOS_THRESHOLD}).",
             )
-            just_now = datetime.utcnow() - timedelta(seconds=45)
-            if not last or last.timestamp < just_now:
-                new_alert = Alert(
-                    ip=ip,
-                    type="Elevated Traffic",
-                    severity="low",
-                    details=f"Traffic elevated: {count} hits within 60s window (pre-alert threshold {pre_alert_threshold}/{DOS_THRESHOLD}).",
-                )
-                db.session.add(new_alert)
-                db.session.commit()
             return False
 
         # Below pre-alert threshold: no alert.
@@ -67,27 +58,20 @@ class DetectionEngine:
         recent_count = Alert.query.filter(
             Alert.ip == ip,
             Alert.type == "Potential DoS Attack",
-            Alert.timestamp >= since,
+            Alert.last_seen >= since,
         ).count()
 
-        # Record a new alert (but only if we haven't logged one in the last 30s)
-        last = (
-            Alert.query.filter_by(ip=ip, type="Potential DoS Attack")
-            .order_by(Alert.id.desc())
-            .first()
+        severity = _dos_severity(count)
+        
+        # Upsert the DoS alert (aggregator will handle rate limiting and deduplication)
+        upsert_alert(
+            ip=ip,
+            alert_type="Potential DoS Attack",
+            severity=severity,
+            details=f"Hit count {count} exceeded threshold {DOS_THRESHOLD} within 60s window (severity={severity}).",
         )
-        just_now = datetime.utcnow() - timedelta(seconds=30)
-        if not last or last.timestamp < just_now:
-            severity = _dos_severity(count)
-            new_alert = Alert(
-                ip=ip,
-                type="Potential DoS Attack",
-                severity=severity,
-                details=f"Hit count {count} exceeded threshold {DOS_THRESHOLD} within 60s window (severity={severity}).",
-            )
-            db.session.add(new_alert)
-            db.session.commit()
-            recent_count += 1
+        
+        recent_count += 1
 
         # Only return True (trigger auto-block) after repeated offences
         return recent_count >= BLOCK_AFTER_ALERTS

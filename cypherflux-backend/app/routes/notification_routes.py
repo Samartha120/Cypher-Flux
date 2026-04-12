@@ -40,12 +40,67 @@ def list_notifications():
     except Exception:
         uid = None
 
+    # ── Optional filters ────────────────────────────────────────────────────
+    severity = request.args.get('severity', '').strip().lower() or None
+    if severity and severity not in ('critical', 'high', 'medium', 'low'):
+        severity = None
+
+    try:
+        page     = max(1, int(request.args.get('page', 1)))
+        per_page = min(200, max(1, int(request.args.get('per_page', 50))))
+    except (ValueError, TypeError):
+        page, per_page = 1, 50
+
     q = Notification.query
     if uid is not None:
         q = q.filter((Notification.user_id == uid) | (Notification.user_id.is_(None)))
+    if severity:
+        q = q.filter(Notification.severity == severity)
 
-    items = q.order_by(Notification.created_at.desc()).limit(200).all()
-    return jsonify([_serialize(n) for n in items]), 200
+    total  = q.count()
+    offset = (page - 1) * per_page
+    items  = q.order_by(Notification.created_at.desc()).offset(offset).limit(per_page).all()
+
+    return jsonify({
+        'items':    [_serialize(n) for n in items],
+        'total':    total,
+        'page':     page,
+        'per_page': per_page,
+        'pages':    (total + per_page - 1) // per_page if per_page else 1,
+    }), 200
+
+
+@notification_bp.route('/notifications/unread-count', methods=['GET'])
+@jwt_required()
+def unread_count():
+    user_id = get_jwt_identity()
+    try:
+        uid = int(user_id)
+    except Exception:
+        uid = None
+
+    q = Notification.query.filter(Notification.is_read == False)  # noqa: E712
+    if uid is not None:
+        q = q.filter((Notification.user_id == uid) | (Notification.user_id.is_(None)))
+    count = q.count()
+    return jsonify({'unread': count}), 200
+
+
+@notification_bp.route('/notifications/mark-all-read', methods=['POST'])
+@jwt_required()
+def mark_all_read():
+    user_id = get_jwt_identity()
+    try:
+        uid = int(user_id)
+    except Exception:
+        return jsonify({'msg': 'Invalid user context'}), 401
+
+    Notification.query.filter(
+        (Notification.user_id == uid) | (Notification.user_id.is_(None)),
+        Notification.is_read == False,  # noqa: E712
+    ).update({'is_read': True}, synchronize_session=False)
+    db.session.commit()
+    return jsonify({'msg': 'All marked as read'}), 200
 
 
 @notification_bp.route('/notifications', methods=['POST'])

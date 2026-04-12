@@ -5,6 +5,8 @@ from flask_jwt_extended import jwt_required
 
 from app.models.alert_model import Alert
 from app.models.block_model import BlockedIP
+from app.models.db import db
+from sqlalchemy import func
 from app.services.monitor.traffic_monitor import monitor
 from app.services.scanner.scan_state import get_last_scan
 
@@ -23,7 +25,7 @@ def _count_open_ports(devices):
 @dashboard_bp.route('/dashboard/stats', methods=['GET'])
 @jwt_required()
 def get_dashboard_stats():
-    alerts_count = Alert.query.count()
+    alerts_count = int(db.session.query(func.sum(Alert.count)).scalar() or 0)
     blocked_ips = BlockedIP.query.count()
 
     traffic = monitor.get_stats() or {}
@@ -104,7 +106,7 @@ def get_dashboard_details():
         for d in normalized_devices
     ]
 
-    alerts = Alert.query.order_by(Alert.timestamp.desc()).limit(50).all()
+    alerts = Alert.query.order_by(Alert.last_seen.desc()).limit(50).all()
     alerts_result = [
         {
             'id': a.id,
@@ -113,7 +115,12 @@ def get_dashboard_details():
             'severity': a.severity or 'medium',
             'hostname': a.hostname,
             'details': a.details,
+            'count': a.count or 1,
+            'alert_score': getattr(a, 'alert_score', 1.0),
             'timestamp': a.timestamp.isoformat() if a.timestamp else None,
+            'first_seen': a.first_seen.isoformat() if getattr(a, 'first_seen', None) else None,
+            'last_seen': a.last_seen.isoformat() if getattr(a, 'last_seen', None) else None,
+            'status': getattr(a, 'status', 'active'),
         }
         for a in alerts
     ]

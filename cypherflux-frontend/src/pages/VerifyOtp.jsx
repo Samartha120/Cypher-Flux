@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import '../styles/login.css';
 
 const OTP_LENGTH = 6;
-const INITIAL_SECONDS = 30;
+const INITIAL_SECONDS = Number(import.meta.env?.VITE_OTP_EXPIRY_SECONDS || 300);
 
 const VerifyOtp = () => {
   const { state } = useLocation();

@@ -21,6 +21,7 @@ def create_app():
         if not jti:
             return True
         return TokenBlocklist.query.filter_by(jti=jti).first() is not None
+
     # Register Global Security Middleware Firewall
     from app.middleware.auth_middleware import setup_middleware
     setup_middleware(app)
@@ -45,5 +46,68 @@ def create_app():
     app.register_blueprint(block_bp, url_prefix='/api')
     app.register_blueprint(notification_bp, url_prefix='/api')
     app.register_blueprint(dashboard_bp, url_prefix='/api')
-    
+
+    # ── APScheduler jobs: cleanup & batch flush ───────────────────────────────
+    # Cleanup runs every 2 hours. Batch flush runs every 10 seconds.
+    _start_schedulers(app)
+
     return app
+
+
+def _start_schedulers(app: Flask) -> None:
+    """Start the background APScheduler jobs.
+
+    Uses a daemon thread so it won't block process exit.
+    Guarded against double-start when Flask reloader forks the process.
+    """
+    import os
+    import logging
+
+    # Werkzeug reloader spawns a child process with WERKZEUG_RUN_MAIN=true.
+    # We only want the scheduler running in the child (actual server) process.
+    if os.environ.get('WERKZEUG_RUN_MAIN') == 'false':
+        return
+
+    try:
+        from apscheduler.schedulers.background import BackgroundScheduler
+    except ImportError:
+        logging.getLogger(__name__).warning(
+            '[Scheduler] apscheduler not installed — skipping background jobs. '
+            'Run: pip install apscheduler'
+        )
+        return
+
+    logger = logging.getLogger(__name__)
+
+    def _cleanup_job():
+        with app.app_context():
+            from app.services.alerts.alert_cleanup import cleanup_old_alerts
+            cleanup_old_alerts()
+
+    def _batch_job():
+        with app.app_context():
+            from app.services.alerts.alert_batch_writer import flush_alert_batch
+            flush_alert_batch()
+
+    scheduler = BackgroundScheduler(daemon=True)
+    
+    # Run the cleanup shortly after startup and then every 2 hours.
+    scheduler.add_job(
+        _cleanup_job,
+        trigger='interval',
+        hours=2,
+        id='alert_cleanup',
+        replace_existing=True,
+    )
+    
+    # Run the batch flush every 10 seconds.
+    scheduler.add_job(
+        _batch_job,
+        trigger='interval',
+        seconds=10,
+        id='alert_batch_flush',
+        replace_existing=True,
+    )
+    
+    scheduler.start()
+    logger.info('[Scheduler] APScheduler started: Cleanup (2h), Batch Flush (10s).')

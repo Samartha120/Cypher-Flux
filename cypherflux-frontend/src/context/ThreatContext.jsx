@@ -15,6 +15,63 @@ export const ThreatProvider = ({ children }) => {
   const intervalRef = useRef(null);
   const blockedIpsRef = useRef([]);
 
+  const normAlertIp = (a) => String(a?.sourceIp || a?.ip || '').trim();
+  const normAlertType = (a) => String(a?.threatType || a?.type || '').trim();
+
+  const severityRank = (sev) => {
+    const s = String(sev || '').toLowerCase();
+    if (s === 'critical') return 4;
+    if (s === 'high') return 3;
+    if (s === 'medium') return 2;
+    if (s === 'low') return 1;
+    return 2;
+  };
+
+  const mergeAlertIntoList = (prevList, incoming) => {
+    const list = Array.isArray(prevList) ? [...prevList] : [];
+    const ip = normAlertIp(incoming);
+    const type = normAlertType(incoming);
+    if (!ip || !type) return list;
+
+    const idx = list.findIndex((a) => normAlertIp(a) === ip && normAlertType(a) === type);
+    if (idx === -1) {
+      return [
+        {
+          ...incoming,
+          sourceIp: incoming?.sourceIp || incoming?.ip,
+          threatType: incoming?.threatType || incoming?.type,
+          count: Number(incoming?.count || 1),
+        },
+        ...list,
+      ].slice(0, 120);
+    }
+
+    const existing = list[idx];
+    const nextCount = Number(existing?.count || 1) + Number(incoming?.count || 1);
+    const existingRisk = Number(existing?.riskScore);
+    const incomingRisk = Number(incoming?.riskScore);
+    const merged = {
+      ...existing,
+      ...incoming,
+      id: existing?.id ?? incoming?.id,
+      count: nextCount,
+      timestamp: incoming?.timestamp || existing?.timestamp,
+      severity:
+        severityRank(incoming?.severity) > severityRank(existing?.severity)
+          ? incoming?.severity
+          : existing?.severity,
+      riskScore:
+        Number.isFinite(existingRisk) && Number.isFinite(incomingRisk)
+          ? Math.max(existingRisk, incomingRisk)
+          : Number.isFinite(existingRisk)
+            ? existingRisk
+            : incomingRisk,
+    };
+
+    list.splice(idx, 1);
+    return [merged, ...list].slice(0, 120);
+  };
+
   const setBlockedIpsAndRef = (updater) => {
     setBlockedIps((prev) => {
       const next = typeof updater === 'function' ? updater(prev) : updater;
@@ -81,7 +138,7 @@ export const ThreatProvider = ({ children }) => {
   }, [isAuthenticated]);
 
   const pushAlert = (alert) => {
-    setAlerts((prev) => [alert, ...prev]);
+    setAlerts((prev) => mergeAlertIntoList(prev, alert));
   };
 
   const updateAlert = (id, patch) => {
@@ -106,9 +163,10 @@ export const ThreatProvider = ({ children }) => {
     });
 
     setAlerts((prev) =>
-      prev.map((a) => {
+      (Array.isArray(prev) ? prev : []).map((a) => {
         if (String(normalizedIp).trim() === '0.0.0.0/0') return { ...a, status: 'Blocked' };
-        return String(a.sourceIp) === String(normalizedIp) ? { ...a, status: 'Blocked' } : a;
+        const src = String(a?.sourceIp || a?.ip || '');
+        return src === String(normalizedIp) ? { ...a, status: 'Blocked' } : a;
       })
     );
   };

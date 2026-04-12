@@ -35,6 +35,16 @@ export const AuthProvider = ({ children }) => {
     return Date.now() < expSeconds * 1000;
   };
 
+  const applyAccessToken = (token) => {
+    sessionStorage.setItem('token', token);
+    if (!sessionStorage.getItem(SESSION_START_KEY)) {
+      sessionStorage.setItem(SESSION_START_KEY, String(Date.now()));
+    }
+    setIsAuthenticated(true);
+    const decoded = parseJwt(token);
+    setUser(decoded ? { username: decoded.username, email: decoded.email } : null);
+  };
+
   useEffect(() => {
     const initAuth = () => {
       // Force login on fresh website open: token is session-scoped, not persistent.
@@ -70,11 +80,7 @@ export const AuthProvider = ({ children }) => {
     try {
       const response = await api.post('/login', { identifier, password });
       if (response.data.access_token) {
-        sessionStorage.setItem('token', response.data.access_token);
-        sessionStorage.setItem(SESSION_START_KEY, String(Date.now()));
-        setIsAuthenticated(true);
-        const decoded = parseJwt(response.data.access_token);
-        setUser(decoded ? { username: decoded.username, email: decoded.email } : null);
+        applyAccessToken(response.data.access_token);
         return { success: true };
       }
       return { success: false, msg: "Invalid credentials" };
@@ -116,12 +122,8 @@ export const AuthProvider = ({ children }) => {
     try {
       const response = await api.post('/verify-otp', { username, otp });
       if (response.data.access_token) {
-        sessionStorage.setItem('token', response.data.access_token);
-        sessionStorage.setItem(SESSION_START_KEY, String(Date.now()));
+        applyAccessToken(response.data.access_token);
         localStorage.removeItem('pendingUsername');
-        setIsAuthenticated(true);
-        const decoded = parseJwt(response.data.access_token);
-        setUser(decoded ? { username: decoded.username, email: decoded.email } : null);
         return { success: true };
       }
       return { success: false, msg: "Invalid Verification Code" };
@@ -141,6 +143,16 @@ export const AuthProvider = ({ children }) => {
     } catch (err) {
       const data = err.response?.data;
       return { success: false, msg: data?.msg || 'Password update failed', errors: data?.errors };
+    }
+  };
+
+  const updateUserProfile = (partialUser) => {
+    setUser((prev) => ({ ...(prev || {}), ...(partialUser || {}) }));
+  };
+
+  const updateAccessToken = (token) => {
+    if (token) {
+      applyAccessToken(token);
     }
   };
 
@@ -170,7 +182,7 @@ export const AuthProvider = ({ children }) => {
   }
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, user, login, signup, sendOtp, verifyOtp, changePassword, logout }}>
+    <AuthContext.Provider value={{ isAuthenticated, user, login, signup, sendOtp, verifyOtp, changePassword, logout, updateUserProfile, updateAccessToken }}>
       {children}
     </AuthContext.Provider>
   );

@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt, get_jwt_identity
 from app.models.user_model import User
+from app.models.user_setting_model import UserSetting
 from app.models.otp_model import OTPCode
 from app.models.token_blocklist_model import TokenBlocklist
 from app.models.db import db
@@ -19,6 +20,9 @@ auth_bp = Blueprint('auth', __name__)
 
 EMAIL_REGEX = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 USERNAME_REGEX = re.compile(r"^[A-Za-z0-9_.-]{3,30}$")
+VALID_LOG_DIGEST_FREQUENCIES = {'realtime', 'hourly', 'daily', 'never'}
+OTP_EXPIRY_SECONDS = int(os.environ.get('OTP_EXPIRY_SECONDS', '300'))
+OTP_RESEND_COOLDOWN_SECONDS = int(os.environ.get('OTP_RESEND_COOLDOWN_SECONDS', '30'))
 
 
 def _now() -> datetime:
@@ -79,28 +83,56 @@ def _issue_token(user: User) -> str:
 
 
 def _generate_and_send_otp(email: str) -> None:
-    # Enforce basic resend cooldown (per email)
-    existing = OTPCode.query.filter_by(email=email).order_by(OTPCode.id.desc()).first()
-    if existing and existing.last_sent_at:
-        if _now() < existing.last_sent_at + timedelta(seconds=30):
-            return
+    try:
+        # Enforce basic resend cooldown (per email)
+        existing = OTPCode.query.filter_by(email=email).order_by(OTPCode.id.desc()).first()
+        if existing and existing.last_sent_at:
+            if _now() < existing.last_sent_at + timedelta(seconds=OTP_RESEND_COOLDOWN_SECONDS):
+                return
 
-    # Remove older OTP rows for this email.
-    OTPCode.query.filter_by(email=email).delete()
+        # Remove older OTP rows for this email.
+        OTPCode.query.filter_by(email=email).delete()
 
-    code = _generate_otp()
-    expiry = _now() + timedelta(seconds=30)
-    otp_hash = _hash_otp(email, code)
+        code = _generate_otp()
+        expiry = _now() + timedelta(seconds=OTP_EXPIRY_SECONDS)
+        otp_hash = _hash_otp(email, code)
 
-    new_otp = OTPCode(email=email, otp=otp_hash, expiry_time=expiry, attempts=0, last_sent_at=_now())
-    db.session.add(new_otp)
-    db.session.commit()
+        new_otp = OTPCode(email=email, otp=otp_hash, expiry_time=expiry, attempts=0, last_sent_at=_now())
+        db.session.add(new_otp)
+        db.session.commit()
 
-    send_otp_email(email, code)
+        send_otp_email(email, code)
+    except Exception as e:
+        print(f"[ERROR] Failed to generate/send OTP for {email}: {type(e).__name__}: {e}")
+        # Re-raise to let the caller handle it
+        raise
 
 
 def _json_error(message: str, status: int):
     return jsonify({"msg": message}), status
+
+
+def _to_bool(value):
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        lowered = value.strip().lower()
+        if lowered in {'true', '1', 'yes', 'on'}:
+            return True
+        if lowered in {'false', '0', 'no', 'off'}:
+            return False
+    return None
+
+
+def _get_or_create_settings(user_id: int) -> UserSetting:
+    settings = UserSetting.query.filter_by(user_id=user_id).first()
+    if settings:
+        return settings
+
+    settings = UserSetting(user_id=user_id)
+    db.session.add(settings)
+    db.session.commit()
+    return settings
 
 @auth_bp.route('/login', methods=['POST'])
 def login():
@@ -139,7 +171,11 @@ def login():
         return _json_error("Bad credentials", 401)
 
     if not user.is_verified:
-        _generate_and_send_otp(user.email)
+        try:
+            _generate_and_send_otp(user.email)
+        except Exception as e:
+            print(f"[ERROR] Failed to send OTP during login: {e}")
+            pass
         try:
             create_notification(
                 event_type='auth.verification_required',
@@ -174,48 +210,61 @@ def login():
 
 @auth_bp.route('/signup', methods=['POST'])
 def signup():
-    data = request.get_json()
-    username = _normalize_username(data.get('username'))
-    email = _normalize_email(data.get('email'))
-    password = data.get('password')
-    confirm_password = data.get('confirm_password') or data.get('confirmPassword') or data.get('confirm')
-
-    if not username or not USERNAME_REGEX.match(username):
-        return _json_error("Invalid username. Use 3-30 chars: letters, numbers, _ . -", 400)
-    if not email or not EMAIL_REGEX.match(email):
-        return _json_error("Invalid email.", 400)
-    if not password or not confirm_password:
-        return _json_error("Missing password or confirm password.", 400)
-    if password != confirm_password:
-        return _json_error("Passwords do not match.", 400)
-
-    pw_errors = _password_strength_errors(password)
-    if pw_errors:
-        return jsonify({"msg": "Weak password.", "errors": pw_errors}), 400
-
-    if User.query.filter_by(username=username).first():
-        return _json_error("Username already exists in system", 400)
-    if User.query.filter_by(email=email).first():
-        return _json_error("Email already exists in system", 400)
-
-    new_user = User(username=username, email=email, password_hash=_hash_password(password), is_verified=False)
-    db.session.add(new_user)
-    db.session.commit()
-
     try:
-        create_notification(
-            event_type='auth.signup',
-            title='Account Created',
-            message='New account created. OTP verification required.',
-            severity='info',
-            user_id=new_user.id,
-            req=request,
-        )
-    except Exception:
-        pass
+        data = request.get_json()
+        username = _normalize_username(data.get('username'))
+        email = _normalize_email(data.get('email'))
+        password = data.get('password')
+        confirm_password = data.get('confirm_password') or data.get('confirmPassword') or data.get('confirm')
 
-    _generate_and_send_otp(email)
-    return jsonify({"msg": "Account created. Verification required.", "username": username, "email": email}), 201
+        if not username or not USERNAME_REGEX.match(username):
+            return _json_error("Invalid username. Use 3-30 chars: letters, numbers, _ . -", 400)
+        if not email or not EMAIL_REGEX.match(email):
+            return _json_error("Invalid email.", 400)
+        if not password or not confirm_password:
+            return _json_error("Missing password or confirm password.", 400)
+        if password != confirm_password:
+            return _json_error("Passwords do not match.", 400)
+
+        pw_errors = _password_strength_errors(password)
+        if pw_errors:
+            return jsonify({"msg": "Weak password.", "errors": pw_errors}), 400
+
+        if User.query.filter_by(username=username).first():
+            return _json_error("Username already exists in system", 400)
+        if User.query.filter_by(email=email).first():
+            return _json_error("Email already exists in system", 400)
+
+        new_user = User(username=username, email=email, password_hash=_hash_password(password), is_verified=False)
+        db.session.add(new_user)
+        db.session.commit()
+
+        try:
+            create_notification(
+                event_type='auth.signup',
+                title='Account Created',
+                message='New account created. OTP verification required.',
+                severity='info',
+                user_id=new_user.id,
+                req=request,
+            )
+        except Exception:
+            pass
+
+        try:
+            _generate_and_send_otp(email)
+        except Exception as e:
+            print(f"[ERROR] OTP generation/sending failed: {e}")
+            # Don't crash signup if OTP fails - user can request new OTP
+            pass
+
+        return jsonify({"msg": "Account created. Verification required.", "username": username, "email": email}), 201
+    
+    except Exception as e:
+        print(f"[ERROR] Signup endpoint error: {type(e).__name__}: {e}")
+        import traceback
+        traceback.print_exc()
+        return _json_error(f"Signup failed: {str(e)}", 500)
 
 
 # Backwards-compatible alias
@@ -249,7 +298,12 @@ def send_otp():
     if user.is_verified:
         return jsonify({"msg": "Account already verified."}), 200
 
-    _generate_and_send_otp(user.email)
+    try:
+        _generate_and_send_otp(user.email)
+    except Exception as e:
+        print(f"[ERROR] Failed to send OTP in send-otp endpoint: {e}")
+        return _json_error(f"Failed to send OTP: {str(e)}", 500)
+    
     try:
         create_notification(
             event_type='auth.otp_sent',
@@ -342,6 +396,115 @@ def verify_otp():
 @auth_bp.route('/verify', methods=['POST'])
 def verify_alias():
     return verify_otp()
+
+
+@auth_bp.route('/settings', methods=['GET'])
+@jwt_required()
+def get_settings():
+    user_id = get_jwt_identity()
+    user = User.query.get(int(user_id))
+    if not user:
+        return _json_error("User not found.", 404)
+
+    settings = _get_or_create_settings(user.id)
+    return jsonify({
+        "username": user.username,
+        "email": user.email,
+        "dos_enabled": settings.dos_filter_enabled,
+        "threat_threshold": settings.threat_threshold,
+        "email_enabled": settings.smtp_alerts_enabled,
+        "log_frequency": settings.log_digest_frequency,
+    }), 200
+
+
+@auth_bp.route('/settings', methods=['PUT'])
+@jwt_required()
+def update_settings():
+    user_id = get_jwt_identity()
+    user = User.query.get(int(user_id))
+    if not user:
+        return _json_error("User not found.", 404)
+
+    data = request.get_json() or {}
+    settings = _get_or_create_settings(user.id)
+    changed_username = False
+
+    if 'username' in data:
+        username = _normalize_username(data.get('username'))
+        if not username:
+            return _json_error("Username cannot be empty.", 400)
+        if not USERNAME_REGEX.match(username):
+            return _json_error("Invalid username. Use 3-30 chars: letters, numbers, _ . -", 400)
+        existing = User.query.filter(User.username == username, User.id != user.id).first()
+        if existing:
+            return _json_error("Username already exists in system", 400)
+        if user.username != username:
+            user.username = username
+            changed_username = True
+
+    if 'dos_enabled' in data:
+        parsed = _to_bool(data.get('dos_enabled'))
+        if parsed is None:
+            return _json_error("dos_enabled must be true or false.", 400)
+        settings.dos_filter_enabled = parsed
+
+    if 'email_enabled' in data:
+        parsed = _to_bool(data.get('email_enabled'))
+        if parsed is None:
+            return _json_error("email_enabled must be true or false.", 400)
+        settings.smtp_alerts_enabled = parsed
+
+    if 'threat_threshold' in data:
+        try:
+            threshold = int(data.get('threat_threshold'))
+        except (TypeError, ValueError):
+            return _json_error("threat_threshold must be a number.", 400)
+        if threshold < 10 or threshold > 200:
+            return _json_error("threat_threshold must be between 10 and 200.", 400)
+        settings.threat_threshold = threshold
+
+    if 'log_frequency' in data:
+        frequency = str(data.get('log_frequency') or '').strip().lower()
+        if frequency not in VALID_LOG_DIGEST_FREQUENCIES:
+            return _json_error("Invalid log frequency.", 400)
+        settings.log_digest_frequency = frequency
+
+    db.session.commit()
+
+    response = {
+        "msg": "Settings updated.",
+        "username": user.username,
+        "email": user.email,
+        "dos_enabled": settings.dos_filter_enabled,
+        "threat_threshold": settings.threat_threshold,
+        "email_enabled": settings.smtp_alerts_enabled,
+        "log_frequency": settings.log_digest_frequency,
+    }
+    if changed_username:
+        response["access_token"] = _issue_token(user)
+
+    return jsonify(response), 200
+
+
+@auth_bp.route('/settings/diagnostics', methods=['GET'])
+@jwt_required()
+def run_settings_diagnostics():
+    try:
+        from app.models.log_model import Log
+        from app.models.block_model import BlockedIP
+        from app.models.alert_model import Alert
+
+        diagnostics = {
+            "database": "online",
+            "users": User.query.count(),
+            "alerts": Alert.query.count(),
+            "logs": Log.query.count(),
+            "blocked_ips": BlockedIP.query.count(),
+            "timestamp": _now().isoformat() + 'Z',
+        }
+        return jsonify({"msg": "Diagnostics complete.", "diagnostics": diagnostics}), 200
+    except Exception:
+        return jsonify({"msg": "Diagnostics failed.", "diagnostics": {"database": "offline"}}), 500
 
 
 @auth_bp.route('/change-password', methods=['POST'])

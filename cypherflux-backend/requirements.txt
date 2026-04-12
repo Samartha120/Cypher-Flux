@@ -14,3 +14,6 @@ bcrypt>=4.1.2
 # Postgres SQL Support & Environment Variables
 psycopg[binary]>=3.1.18
 python-dotenv>=1.0.0
+
+# Background scheduler (alert cleanup cron)
+apscheduler>=3.10.4
