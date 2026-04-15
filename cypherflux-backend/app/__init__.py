@@ -4,6 +4,7 @@ from flask_jwt_extended import JWTManager
 from app.config import Config
 from app.models.db import db
 from app.models.token_blocklist_model import TokenBlocklist
+from app.services.db.runtime_migrations import run_runtime_migrations
 
 def create_app():
     app = Flask(__name__)
@@ -46,6 +47,10 @@ def create_app():
     app.register_blueprint(block_bp, url_prefix='/api')
     app.register_blueprint(notification_bp, url_prefix='/api')
     app.register_blueprint(dashboard_bp, url_prefix='/api')
+
+    with app.app_context():
+        db.create_all()
+        run_runtime_migrations()
 
     # ── APScheduler jobs: cleanup & batch flush ───────────────────────────────
     # Cleanup runs every 2 hours. Batch flush runs every 10 seconds.

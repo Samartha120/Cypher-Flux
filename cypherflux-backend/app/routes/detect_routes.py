@@ -8,10 +8,10 @@ detect_bp = Blueprint('detect', __name__)
 # No JWT here commonly to allow system to trace generic traffic pings
 def simulate_traffic():
     """Simulates a ping from an IP to trigger detection logic."""
-    data = request.get_json()
+    data = request.get_json() or {}
     ip = data.get('ip', request.remote_addr)
     
-    count = monitor.log_request(ip)
+    count = monitor.log_request(ip, path=data.get('path', '/api/detect'), method=data.get('method', 'POST'))
     is_attack = DetectionEngine.analyze_traffic(ip, count)
     
     return jsonify({"ip": ip, "count": count, "alert_triggered": is_attack}), 200

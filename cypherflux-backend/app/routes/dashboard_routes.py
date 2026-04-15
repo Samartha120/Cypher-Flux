@@ -8,6 +8,7 @@ from app.models.block_model import BlockedIP
 from app.models.db import db
 from sqlalchemy import func
 from app.services.monitor.traffic_monitor import monitor
+from app.services.response.block_service import serialize_block
 from app.services.scanner.scan_state import get_last_scan
 
 dashboard_bp = Blueprint('dashboard', __name__)
@@ -47,6 +48,7 @@ def get_dashboard_stats():
             "blockedIps": blocked_ips,
             "lastScanTarget": last_scan.get('target'),
             "lastScanAt": ts.isoformat() if ts else None,
+            "trafficSummary": monitor.get_summary(),
         }
     ), 200
 
@@ -125,18 +127,10 @@ def get_dashboard_details():
         for a in alerts
     ]
 
-    blocked = BlockedIP.query.order_by(BlockedIP.timestamp.desc()).all()
-    blocked_result = [
-        {
-            'id': b.id,
-            'ip': b.ip,
-            'reason': b.reason,
-            'timestamp': b.timestamp.isoformat() if b.timestamp else None,
-        }
-        for b in blocked
-    ]
+    blocked = BlockedIP.query.order_by(BlockedIP.blocked_at.desc(), BlockedIP.timestamp.desc()).all()
+    blocked_result = [serialize_block(b) for b in blocked]
 
-    traffic = monitor.get_stats() or {}
+    traffic_rows = monitor.get_detailed_stats()
 
     ts = last_scan.get('timestamp')
     return jsonify(
@@ -145,7 +139,9 @@ def get_dashboard_details():
             'openPortsByDevice': open_ports_by_device,
             'alerts': alerts_result,
             'blockedIps': blocked_result,
-            'activeTrafficIps': [{"ip": k, "requests": v} for k, v in traffic.items()],
+            'activeTrafficIps': traffic_rows,
+            'trafficTimeline': monitor.get_timeline(),
+            'trafficSummary': monitor.get_summary(),
             'lastScanTarget': last_scan.get('target'),
             'lastScanAt': ts.isoformat() if ts else None,
         }

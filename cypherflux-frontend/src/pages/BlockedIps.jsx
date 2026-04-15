@@ -4,6 +4,14 @@ import { Ban } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useThreats } from '../context/ThreatContext';
 
+const severityColor = (severity) => {
+  const sev = String(severity || '').toLowerCase();
+  if (sev === 'critical') return 'var(--neon-red)';
+  if (sev === 'high') return '#f97316';
+  if (sev === 'medium') return '#facc15';
+  return 'var(--neon-blue)';
+};
+
 const BlockedIPs = () => {
   const [blocks, setBlocks] = useState([]);
   const [newIp, setNewIp] = useState('');
@@ -24,10 +32,19 @@ const BlockedIPs = () => {
 
   const handleBlock = async () => {
     try {
-      await api.post('/blocked', { ip: newIp, reason: reason || 'Manual block' });
+      const payload = {
+        ip: newIp,
+        reason: reason || 'Manual block',
+        attackType: 'Manual firewall rule',
+        details: reason || 'Blocked manually by analyst from the firewall blocks page.',
+        detectionSource: 'Blocked IPs',
+        severity: 'medium',
+        actionType: 'manual',
+      };
+      const blockRes = await api.post('/blocked', payload);
 
       const normalized = String(newIp || '').trim() === '0.0.0.0' ? '0.0.0.0/0' : newIp;
-      blockIp(normalized, reason || 'Manual block');
+      blockIp(normalized, blockRes?.data?.item || payload);
 
       setNewIp('');
       setReason('');
@@ -78,21 +95,33 @@ const BlockedIPs = () => {
         <table className="cyber-table">
           <thead>
             <tr>
-              <th>ID</th>
               <th>Timestamp</th>
               <th>Blocked IP Address</th>
+              <th>Attack Type</th>
+              <th>Source</th>
+              <th>Severity</th>
+              <th>Action</th>
+              <th>Risk</th>
               <th>Reason</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
             {blocks.length === 0 ? (
-              <tr><td colSpan="5" style={{textAlign: 'center'}}>No manually blocked IPs.</td></tr>
+              <tr><td colSpan="9" style={{textAlign: 'center'}}>No blocked IPs recorded.</td></tr>
             ) : blocks.map((b, i) => (
               <tr key={i}>
-                <td>{b.id}</td>
-                <td>{new Date(b.timestamp).toLocaleString()}</td>
+                <td>{new Date(b.blockedAt || b.timestamp).toLocaleString()}</td>
                 <td className="text-red font-bold">{b.ip}</td>
+                <td>{b.attackType || 'Manual firewall rule'}</td>
+                <td>{b.detectionSource || 'Blocked IPs'}</td>
+                <td>
+                  <span style={{ color: severityColor(b.severity), fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px' }}>
+                    {b.severity || 'medium'}
+                  </span>
+                </td>
+                <td style={{ textTransform: 'uppercase' }}>{b.actionType || 'manual'}</td>
+                <td>{Number(b.riskScore || 0)}</td>
                 <td>{b.reason}</td>
                 <td style={{ textAlign: 'right' }}>
                   {b?.id != null ? (
@@ -124,6 +153,28 @@ const BlockedIPs = () => {
           </tbody>
         </table>
       </div>
+      {blocks.length > 0 ? (
+        <div className="glass-card mt-4" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px' }}>
+          {blocks.slice(0, 3).map((block) => (
+            <div
+              key={`summary-${block.id}`}
+              style={{
+                padding: '14px',
+                borderRadius: '14px',
+                border: `1px solid ${severityColor(block.severity)}33`,
+                background: 'rgba(255,255,255,0.02)',
+              }}
+            >
+              <div style={{ color: severityColor(block.severity), fontWeight: 900, textTransform: 'uppercase', letterSpacing: '1px', fontSize: '0.76rem' }}>
+                {block.severity || 'medium'} risk
+              </div>
+              <div style={{ fontFamily: 'monospace', fontSize: '1rem', marginTop: '8px', marginBottom: '8px' }}>{block.ip}</div>
+              <div style={{ color: 'var(--text-muted)', fontSize: '0.84rem' }}>{block.attackType || block.reason}</div>
+              <div style={{ marginTop: '10px', fontSize: '0.8rem' }}>Source: {block.detectionSource || 'Blocked IPs'}</div>
+            </div>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 };

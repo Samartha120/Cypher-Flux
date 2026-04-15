@@ -44,7 +44,17 @@ const BlockDetails = () => {
       id: loadedBlock.id,
       ip: loadedBlock.ip,
       reason: loadedBlock.reason,
-      timestamp: loadedBlock.timestamp,
+      timestamp: loadedBlock.blockedAt || loadedBlock.timestamp,
+      attackType: loadedBlock.attackType || loadedBlock.attack_type,
+      details: loadedBlock.details,
+      detectionSource: loadedBlock.detectionSource || loadedBlock.detection_source,
+      severity: loadedBlock.severity,
+      riskScore: loadedBlock.riskScore ?? loadedBlock.risk_score,
+      actionType: loadedBlock.actionType || loadedBlock.action_type,
+      requestCount: loadedBlock.requestCount ?? loadedBlock.request_count,
+      lastPath: loadedBlock.lastPath || loadedBlock.last_path,
+      lastMethod: loadedBlock.lastMethod || loadedBlock.last_method,
+      sourceAlertId: loadedBlock.sourceAlertId ?? loadedBlock.source_alert_id,
     };
   }, [loadedBlock]);
 
@@ -99,6 +109,38 @@ const BlockDetails = () => {
             <div>
               <div style={{ color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 2, fontSize: '0.8rem' }}>Reason</div>
               <div style={{ fontWeight: 800 }}>{block.reason || '—'}</div>
+            </div>
+            <div>
+              <div style={{ color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 2, fontSize: '0.8rem' }}>Attack Type</div>
+              <div>{block.attackType || '—'}</div>
+            </div>
+            <div>
+              <div style={{ color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 2, fontSize: '0.8rem' }}>Detection Source</div>
+              <div>{block.detectionSource || '—'}</div>
+            </div>
+            <div>
+              <div style={{ color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 2, fontSize: '0.8rem' }}>Severity</div>
+              <div style={{ textTransform: 'uppercase', fontWeight: 800 }}>{block.severity || '—'}</div>
+            </div>
+            <div>
+              <div style={{ color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 2, fontSize: '0.8rem' }}>Risk Score</div>
+              <div>{block.riskScore ?? '—'}</div>
+            </div>
+            <div>
+              <div style={{ color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 2, fontSize: '0.8rem' }}>Action Type</div>
+              <div style={{ textTransform: 'uppercase' }}>{block.actionType || '—'}</div>
+            </div>
+            <div>
+              <div style={{ color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 2, fontSize: '0.8rem' }}>Request Count</div>
+              <div>{block.requestCount ?? '—'}</div>
+            </div>
+            <div>
+              <div style={{ color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 2, fontSize: '0.8rem' }}>Last Request</div>
+              <div>{block.lastMethod && block.lastPath ? `${block.lastMethod} ${block.lastPath}` : '—'}</div>
+            </div>
+            <div style={{ gridColumn: '1 / -1' }}>
+              <div style={{ color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 2, fontSize: '0.8rem' }}>Detailed Description</div>
+              <div>{block.details || 'No detailed explanation stored for this block.'}</div>
             </div>
           </div>
         </div>

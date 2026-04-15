@@ -7,6 +7,27 @@ const ThreatContext = createContext(null);
 
 const randomInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
 
+const normalizeBlockEntry = (entry, fallback = {}) => {
+  const ip = String(entry?.ip || fallback?.ip || '').trim();
+  return {
+    id: entry?.id ?? fallback?.id ?? `blk-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    ip,
+    reason: entry?.reason || fallback?.reason || 'Manual block',
+    attackType: entry?.attackType || entry?.attack_type || fallback?.attackType || null,
+    details: entry?.details || fallback?.details || null,
+    detectionSource: entry?.detectionSource || entry?.detection_source || fallback?.detectionSource || 'Blocked IPs',
+    severity: entry?.severity || fallback?.severity || 'medium',
+    riskScore: Number(entry?.riskScore ?? entry?.risk_score ?? fallback?.riskScore ?? 0),
+    actionType: entry?.actionType || entry?.action_type || fallback?.actionType || 'manual',
+    sourceAlertId: entry?.sourceAlertId ?? entry?.source_alert_id ?? fallback?.sourceAlertId ?? null,
+    requestCount: Number(entry?.requestCount ?? entry?.request_count ?? fallback?.requestCount ?? 0) || null,
+    lastPath: entry?.lastPath || entry?.last_path || fallback?.lastPath || null,
+    lastMethod: entry?.lastMethod || entry?.last_method || fallback?.lastMethod || null,
+    blockedAt: entry?.blockedAt || entry?.timestamp || fallback?.blockedAt || new Date().toISOString(),
+    timestamp: entry?.timestamp || entry?.blockedAt || fallback?.timestamp || new Date().toISOString(),
+  };
+};
+
 export const ThreatProvider = ({ children }) => {
   const { isAuthenticated } = useAuth();
   const [alerts, setAlerts] = useState([]);
@@ -95,12 +116,23 @@ export const ThreatProvider = ({ children }) => {
 
   const mergeBlockedIps = (prev, incoming) => {
     const list = [];
-    const seen = new Set();
+    const seen = new Map();
     const add = (entry) => {
       const key = String(entry?.ip || '').trim();
-      if (!key || seen.has(key)) return;
-      seen.add(key);
-      list.push(entry);
+      if (!key) return;
+      const normalized = normalizeBlockEntry(entry);
+      if (!seen.has(key)) {
+        seen.set(key, normalized);
+        list.push(normalized);
+        return;
+      }
+      const idx = list.findIndex((item) => String(item?.ip || '').trim() === key);
+      if (idx === -1) return;
+      list[idx] = {
+        ...list[idx],
+        ...normalized,
+        riskScore: Math.max(Number(list[idx]?.riskScore || 0), Number(normalized?.riskScore || 0)),
+      };
     };
 
     (Array.isArray(incoming) ? incoming : []).forEach(add);
@@ -118,13 +150,7 @@ export const ThreatProvider = ({ children }) => {
       try {
         const res = await api.get('/blocked');
         if (cancelled) return;
-        const normalized = (Array.isArray(res.data) ? res.data : []).map((b) => ({
-          id: b.id,
-          ip: b.ip,
-          reason: b.reason,
-          blockedAt: b.timestamp,
-          sourceAlertId: null,
-        }));
+        const normalized = (Array.isArray(res.data) ? res.data : []).map((b) => normalizeBlockEntry(b));
         setBlockedIpsAndRef((prev) => mergeBlockedIps(prev, normalized));
       } catch {
         // Ignore: backend might be offline; keep local-only blocks.
@@ -145,22 +171,20 @@ export const ThreatProvider = ({ children }) => {
     setAlerts((prev) => prev.map((a) => (a.id === id ? { ...a, ...patch } : a)));
   };
 
-  const blockIp = (ip, reason = 'Analyst action', sourceAlertId = null) => {
+  const blockIp = (ip, reasonOrOptions = 'Analyst action', sourceAlertId = null) => {
     if (!ip) return;
 
     const normalizedIp = String(ip).trim() === '0.0.0.0' ? '0.0.0.0/0' : ip;
-
-    setBlockedIpsAndRef((prev) => {
-      if (prev.some((b) => b.ip === normalizedIp)) return prev;
-      const entry = {
-        id: `blk-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-        ip: normalizedIp,
-        reason,
-        blockedAt: new Date().toISOString(),
-        sourceAlertId,
-      };
-      return [entry, ...prev].slice(0, 50);
+    const options = typeof reasonOrOptions === 'object' && reasonOrOptions !== null
+      ? reasonOrOptions
+      : { reason: reasonOrOptions, sourceAlertId };
+    const entry = normalizeBlockEntry({
+      ...options,
+      ip: normalizedIp,
+      sourceAlertId: options?.sourceAlertId ?? sourceAlertId,
     });
+
+    setBlockedIpsAndRef((prev) => mergeBlockedIps([entry], prev));
 
     setAlerts((prev) =>
       (Array.isArray(prev) ? prev : []).map((a) => {
@@ -242,6 +266,7 @@ export const ThreatProvider = ({ children }) => {
       isIpBlocked,
       isBlockAll,
       exportAlertsCsv,
+      normalizeBlockEntry,
     }),
     [alerts, blockedIps, autoRefresh]
   );

@@ -21,7 +21,7 @@ import {
 const Dashboard = () => {
   const { user } = useAuth();
 
-  const [liveMode, setLiveMode] = useState(true);
+  const [liveMode, setLiveMode] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(false);
   const [lastUpdatedAt, setLastUpdatedAt] = useState(null);
 
@@ -77,6 +77,7 @@ const Dashboard = () => {
     openPortsByDevice: [],
     alerts: [],
     blockedIps: [],
+    trafficTimeline: [],
     lastScanAt: null,
     lastScanTarget: null,
   });
@@ -568,6 +569,8 @@ const Dashboard = () => {
     const tick = async () => {
       await fetchStats();
       if (!alive) return;
+      await fetchDetails();
+      if (!alive) return;
     };
     tick();
     const id = setInterval(tick, 3000);
@@ -620,9 +623,20 @@ const Dashboard = () => {
         openPortsByDevice: Array.isArray(data.openPortsByDevice) ? data.openPortsByDevice : [],
         alerts,
         blockedIps: Array.isArray(data.blockedIps) ? data.blockedIps : [],
+        trafficTimeline: Array.isArray(data.trafficTimeline) ? data.trafficTimeline : [],
         lastScanAt: data.lastScanAt || null,
         lastScanTarget: data.lastScanTarget || null,
       });
+
+      const backendTimeline = (Array.isArray(data.trafficTimeline) ? data.trafficTimeline : [])
+        .map((point) => ({
+          time: point?.time || '—',
+          requests: Number(point?.requests || 0),
+        }))
+        .slice(-20);
+      if (backendTimeline.length) {
+        setTrafficData(backendTimeline);
+      }
 
       // Keep alerts timeline graph updating in non-live mode too.
       const totalHits = alerts.reduce((sum, a) => sum + Number(a?.count || 1), 0);
@@ -636,6 +650,7 @@ const Dashboard = () => {
         openPortsByDevice: [],
         alerts: [],
         blockedIps: [],
+        trafficTimeline: [],
         lastScanAt: null,
         lastScanTarget: null,
       });
@@ -801,7 +816,7 @@ const Dashboard = () => {
     activityPinnedRef.current = el.scrollTop <= 8;
   };
 
-  const upsertBlockedIpLocal = (prev, ip, reason) => {
+  const upsertBlockedIpLocal = (prev, ip, reason, threat = null) => {
     const list = Array.isArray(prev) ? [...prev] : [];
     const key = String(ip || '').trim();
     if (!key) return list;
@@ -811,6 +826,13 @@ const Dashboard = () => {
         id: `ui-blk-${Date.now()}-${Math.random().toString(16).slice(2)}`,
         ip: key,
         reason: reason || 'Manual block',
+        attackType: threat?.type || 'Threat response',
+        details: threat?.details || `Blocked from Active Threat Response after ${threat?.type || 'security event'}.`,
+        detectionSource: 'Active Threat Response',
+        severity: threat?.severity || 'high',
+        riskScore: threat?.riskScore ?? 70,
+        actionType: 'manual',
+        requestCount: threat?.count ?? null,
         timestamp: new Date().toISOString(),
       },
       ...list,
@@ -872,7 +894,7 @@ const Dashboard = () => {
     if (liveMode) {
       // Persist into the simulator source-of-truth.
       const sim = simRef.current;
-      sim.blockedIps = upsertBlockedIpLocal(sim.blockedIps, ip, 'Manual block (SOC response)');
+      sim.blockedIps = upsertBlockedIpLocal(sim.blockedIps, ip, 'Manual block (SOC response)', threat);
       sim.alerts = (Array.isArray(sim.alerts) ? sim.alerts : []).map((a) =>
         String(a?.ip || '') === ip ? { ...a, status: 'Blocked' } : a
       );
@@ -882,13 +904,24 @@ const Dashboard = () => {
         alerts: (Array.isArray(prev?.alerts) ? prev.alerts : []).map((a) =>
           String(a?.ip || '') === ip ? { ...a, status: 'Blocked' } : a
         ),
-        blockedIps: upsertBlockedIpLocal(prev?.blockedIps, ip, 'Manual block (SOC response)'),
+        blockedIps: upsertBlockedIpLocal(prev?.blockedIps, ip, 'Manual block (SOC response)', threat),
       }));
       setStats((prev) => ({ ...prev, blockedIps: Number(sim.blockedIps?.length || 0) }));
     }
 
     try {
-      await api.post('/blocked', { ip, reason: 'Manual block (SOC response)' });
+      await api.post('/blocked', {
+        ip,
+        reason: 'Manual block (SOC response)',
+        attackType: threat?.type || 'Threat response',
+        details: threat?.details || `Blocked from Active Threat Response after ${threat?.type || 'security event'}.`,
+        detectionSource: 'Active Threat Response',
+        severity: threat?.severity || 'high',
+        riskScore: threat?.riskScore,
+        actionType: 'manual',
+        sourceAlertId: canPersistAction ? alertId : null,
+        requestCount: threat?.count,
+      });
       if (canPersistAction) {
         await api.put(`/alerts/${alertId}/status`, { status: 'blocked' });
       }
