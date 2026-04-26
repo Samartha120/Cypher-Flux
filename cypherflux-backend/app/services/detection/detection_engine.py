@@ -24,28 +24,30 @@ BLOCK_AFTER_ALERTS = _int_env('BLOCK_AFTER_ALERTS', 3)
 ALERT_WINDOW_MINUTES = 5
 
 
-def _dos_severity(hit_count: int) -> str:
-    threshold = max(DOS_THRESHOLD, 1)
-    ratio = hit_count / threshold
-    # Scale severity based on how far above the threshold we are.
-    if ratio >= 3.0:
-        return 'critical'
-    if ratio >= 2.0:
-        return 'high'
-    return 'medium'
-
-
 class DetectionEngine:
     @staticmethod
-    def analyze_traffic(ip, count):
+    def _dos_severity(hit_count, threshold):
+        t = max(threshold, 1)
+        ratio = hit_count / t
+        # Scale severity based on how far above the threshold we are.
+        if ratio >= 3.0:
+            return 'critical'
+        if ratio >= 2.0:
+            return 'high'
+        return 'medium'
+
+    @staticmethod
+    def analyze_traffic(ip, count, threshold=None):
+        active_threshold = threshold if threshold is not None else DOS_THRESHOLD
+        
         # 1) Low severity early warning for elevated traffic (pre-threshold)
-        pre_alert_threshold = int(max(DOS_THRESHOLD, 1) * PRE_ALERT_RATIO)
-        if pre_alert_threshold <= count <= DOS_THRESHOLD:
+        pre_alert_threshold = int(max(active_threshold, 1) * PRE_ALERT_RATIO)
+        if pre_alert_threshold <= count <= active_threshold:
             upsert_alert(
                 ip=ip,
                 alert_type="Elevated Traffic",
                 severity="low",
-                details=f"Traffic elevated: {count} hits within 60s window (pre-alert threshold {pre_alert_threshold}/{DOS_THRESHOLD}).",
+                details=f"Traffic elevated: {count} hits within 60s window (pre-alert threshold {pre_alert_threshold}/{active_threshold}).",
             )
             return False
 
@@ -61,14 +63,14 @@ class DetectionEngine:
             Alert.last_seen >= since,
         ).count()
 
-        severity = _dos_severity(count)
+        severity = DetectionEngine._dos_severity(count, active_threshold)
         
         # Upsert the DoS alert (aggregator will handle rate limiting and deduplication)
         upsert_alert(
             ip=ip,
             alert_type="Potential DoS Attack",
             severity=severity,
-            details=f"Hit count {count} exceeded threshold {DOS_THRESHOLD} within 60s window (severity={severity}).",
+            details=f"Hit count {count} exceeded threshold {active_threshold} within 60s window (severity={severity}).",
         )
         
         recent_count += 1

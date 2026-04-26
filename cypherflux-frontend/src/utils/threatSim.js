@@ -85,9 +85,26 @@ const randomPrivateIp = () => {
 };
 
 export const ipToCountry = (ip) => {
-  const first = Number(String(ip || '').split('.')[0]);
-  const idx = Number.isFinite(first) ? first % COUNTRIES.length : randomInt(0, COUNTRIES.length - 1);
-  return COUNTRIES[idx];
+  const parts = String(ip || '0.0.0.0').split('.');
+  // Better hash for diversity
+  const hash = parts.reduce((acc, part, idx) => acc + (Number(part) * (idx + 1)), 0);
+  
+  // If localhost, return a truly random country to avoid static visuals when running locally
+  if (ip === '127.0.0.1') {
+    const randomIdx = (Date.now() + hash) % COUNTRIES.length;
+    return COUNTRIES[randomIdx];
+  }
+  
+  return COUNTRIES[hash % COUNTRIES.length];
+};
+
+export const getRandomTargetDevice = () => {
+  const devices = [
+    'Mainframe-SRV-01', 'Database-Cluster-A', 'Edge-Gateway-North', 
+    'Secure-Proxy-04', 'Auth-Node-Alpha', 'Storage-SAN-02',
+    'Workstation-CEO', 'Finance-Terminal-01', 'Cloud-VPC-Ingress'
+  ];
+  return devices[randomInt(0, devices.length - 1)];
 };
 
 const randomUuid = () => {

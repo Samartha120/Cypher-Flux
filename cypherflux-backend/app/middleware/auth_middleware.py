@@ -58,12 +58,16 @@ def setup_middleware(app):
             return
 
         # ── Trusted / private IPs are never subject to automated blocking. ──
-        # This prevents the frontend dev server (localhost) from auto-blocking
-        # itself after many rapid polling requests.
         if _is_trusted_ip(ip):
-            # Still log traffic for dashboard visibility, but skip all block checks.
             monitor.log_request(ip)
             return
+
+        # Fetch Global Security Policy from the primary user settings
+        # In a multi-user environment, this would be scoped to the target's owner.
+        from app.models.user_setting_model import UserSetting
+        policy = UserSetting.query.first()
+        dos_enabled = policy.dos_filter_enabled if policy else True
+        threshold = policy.threat_threshold if policy else 50
 
         # Rate-limited request logging for live dashboards
         now = time.time()
@@ -86,9 +90,9 @@ def setup_middleware(app):
         hit_count = monitor.log_request(ip)
 
         # 3. ACTIVE THREAT DETECTION: Send telemetry to engine
-        is_attack = DetectionEngine.analyze_traffic(ip, hit_count)
+        is_attack = DetectionEngine.analyze_traffic(ip, hit_count, threshold=threshold)
 
-        if is_attack:
+        if is_attack and dos_enabled:
             # 4. COUNTERMEASURE: Trigger permanent ban
             new_block = BlockedIP(ip=ip, reason="Automated DoS Firewall Protection")
             db.session.add(new_block)
@@ -100,14 +104,14 @@ def setup_middleware(app):
                     ip=ip,
                     type="IP Auto-Blocked",
                     severity="critical",
-                    details=f"Automated DoS protection triggered (hits={hit_count}, path={request.path}).",
+                    details=f"Automated DoS protection triggered (hits={hit_count}, path={request.path}, threshold={threshold}).",
                 )
                 db.session.add(block_alert)
                 db.session.commit()
             except Exception:
                 db.session.rollback()
 
-            _write_log(f"Automated DoS protection triggered | ip={ip} | hits={hit_count} | path={request.path}")
+            _write_log(f"Automated DoS protection triggered | ip={ip} | hits={hit_count} | path={request.path} | threshold={threshold}")
 
             return jsonify({
                 "error": "Connection Terminated. Automated DoS protection triggered."

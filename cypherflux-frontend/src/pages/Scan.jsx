@@ -2,8 +2,10 @@ import React, { useState } from 'react';
 import { Search } from 'lucide-react';
 import Loader from '../components/Loader';
 import { scanNetworkTarget } from '../utils/networkScan';
+import { useThreats } from '../context/useThreats';
 
 const Scan = () => {
+  const { addAuditLog } = useThreats();
   const [target, setTarget] = useState('127.0.0.1');
   const [result, setResult] = useState(null);
   const [results, setResults] = useState(null);
@@ -16,15 +18,20 @@ const Scan = () => {
       setLoading(true);
       setResult(null);
       setResults(null);
+      addAuditLog(`NETWORK RECONNAISSANCE: Initiating scan on target ${target}`, 'info', 'SCANNER', `PROTO: TCP/SYN | TARGET: ${target}`);
 
       const scan = await scanNetworkTarget(target);
       if (scan && Array.isArray(scan.devices)) {
         setResults(scan);
+        addAuditLog(`SCAN COMPLETE: Discovered ${scan.devices.length} active nodes on network.`, 'success', 'SCANNER', `NODES: ${scan.devices.length} | LAT: ${scan.latency || 'N/A'}ms`);
       } else {
         setResult(scan);
+        addAuditLog(`SCAN COMPLETE: Target ${target} is ${scan.state || 'offline'}.`, 'success', 'SCANNER', `STATE: ${scan.state?.toUpperCase()} | HOP: ${scan.hops || 1}`);
       }
     } catch (err) {
-      setError(err?.code === 'INVALID_IP' ? 'Invalid IPv4 address. Example: 192.168.1.10' : 'Scan failed.');
+      const isInvalid = err?.code === 'INVALID_IP';
+      setError(isInvalid ? 'Invalid IPv4 address. Example: 192.168.1.10' : 'Scan failed.');
+      addAuditLog(`SCAN FAILED: ${isInvalid ? 'Invalid target format' : 'Internal engine error'}.`, 'error', 'SCANNER', `ERR: ${isInvalid ? 'CODE_0x02' : 'CODE_0x05'}`);
     }
     setLoading(false);
   };

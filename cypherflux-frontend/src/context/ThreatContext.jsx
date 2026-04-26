@@ -1,4 +1,4 @@
-import React, { createContext, useEffect, useMemo, useRef, useState } from 'react';
+import React, { createContext, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import api from '../services/api';
 import { csvHeader, generateThreatEvent, threatToCsvRow } from '../utils/threatSim';
 import { useAuth } from './AuthContext';
@@ -171,6 +171,16 @@ export const ThreatProvider = ({ children }) => {
     );
   };
 
+  const unblockIp = (ip) => {
+    if (!ip) return;
+    setBlockedIpsAndRef((prev) => prev.filter((b) => b.ip !== ip));
+    setAlerts((prev) =>
+      (Array.isArray(prev) ? prev : []).map((a) => {
+        const src = String(a?.sourceIp || a?.ip || '');
+        return src === String(ip) ? { ...a, status: 'Active' } : a;
+      })
+    );
+  };
   const clearBlockedIps = () => {
     blockedIpsRef.current = [];
     setBlockedIps([]);
@@ -190,7 +200,6 @@ export const ThreatProvider = ({ children }) => {
   useEffect(() => {
     if (!autoRefresh) return;
 
-    // Generate alerts intermittently; sometimes none, sometimes bursts.
     intervalRef.current = setInterval(() => {
       const roll = Math.random();
       if (roll < 0.55) return;
@@ -225,6 +234,46 @@ export const ThreatProvider = ({ children }) => {
     URL.revokeObjectURL(url);
   };
 
+  // Global Audit Logging for the System Activity Console
+  const [auditLogs, setAuditLogs] = useState([
+    { 
+      id: 1, 
+      type: 'info', 
+      category: 'SYSTEM',
+      msg: 'Core Security Systems Online. Awaiting telemetry...', 
+      ts: new Date().toLocaleTimeString(),
+      source: 'KERN',
+      details: 'V-FLUX ENGINE v4.2.0 | PID: 1024 | CPU: 0.1%'
+    }
+  ]);
+
+  const addAuditLog = useCallback((msg, type = 'info', category = 'SYSTEM', details = '') => {
+    const sources = {
+      'info': 'SYS',
+      'error': 'CRIT',
+      'warning': 'WARN',
+      'success': 'OK',
+      'debug': 'UI',
+      'critical': 'KERN'
+    };
+    
+    // Generate some techy jitter if no details provided
+    const techDetails = details || `MEM: ${Math.floor(Math.random() * 1000)}MB | LAT: ${Math.floor(Math.random() * 50)}ms`;
+
+    setAuditLogs((prev) => [
+      { 
+        id: Date.now() + Math.random(), 
+        type, 
+        category: category.toUpperCase(),
+        msg, 
+        ts: new Date().toLocaleTimeString(),
+        source: sources[type] || 'UI',
+        details: techDetails
+      },
+      ...prev.slice(0, 49) // Increased log history
+    ]);
+  }, []);
+
   const value = useMemo(
     () => ({
       alerts,
@@ -235,6 +284,7 @@ export const ThreatProvider = ({ children }) => {
       updateAlert,
       clearAlerts,
       blockIp,
+      unblockIp,
       clearBlockedIps,
       markInvestigating,
       markActive,
@@ -242,8 +292,11 @@ export const ThreatProvider = ({ children }) => {
       isIpBlocked,
       isBlockAll,
       exportAlertsCsv,
+      auditLogs,
+      addAuditLog,
+      clearAuditLogs: () => setAuditLogs([]),
     }),
-    [alerts, blockedIps, autoRefresh]
+    [alerts, blockedIps, autoRefresh, auditLogs, addAuditLog]
   );
 
   return <ThreatContext.Provider value={value}>{children}</ThreatContext.Provider>;

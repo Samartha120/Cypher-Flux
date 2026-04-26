@@ -177,6 +177,30 @@ def upsert_alert(
         )
         db.session.add(new_alert)
         db.session.commit()
+
+        # ── SMTP Breach Alert Logic ──────────────────────────────────────────
+        # If this is a new critical alert, check if email notifications are enabled.
+        if severity == 'critical':
+            try:
+                from app.models.user_setting_model import UserSetting
+                from app.models.user_model import User
+                from app.services.email.email_service import send_breach_alert
+                
+                # Fetch global security policy (primary admin settings)
+                policy = UserSetting.query.first()
+                if policy and policy.smtp_alerts_enabled:
+                    # Send to the primary admin account
+                    admin = User.query.get(policy.user_id)
+                    if admin and admin.email:
+                        send_breach_alert(admin.email, {
+                            "ip": ip,
+                            "type": alert_type,
+                            "severity": severity,
+                            "details": details or "No additional forensic data available."
+                        })
+            except Exception as email_err:
+                logger.error('[Aggregator] Failed to trigger breach email: %s', email_err)
+
         logger.debug(
             '[Aggregator] Inserted new alert id=%d %s %s (score=%.2f)',
             new_alert.id, severity, alert_type, new_score,

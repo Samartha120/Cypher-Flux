@@ -4,14 +4,23 @@ import { useThreats } from '../context/useThreats';
 import { Link, useParams } from 'react-router-dom';
 
 const Alerts = () => {
-  const { alerts = [] } = useThreats();
+  const { alerts = [], addAuditLog } = useThreats();
   const rows = Array.isArray(alerts) ? alerts : [];
 
   const { severity } = useParams();
+  
   const severityFilter = useMemo(() => {
     const s = String(severity || '').toLowerCase();
     return ['critical', 'high', 'medium', 'low'].includes(s) ? s : null;
   }, [severity]);
+
+  React.useEffect(() => {
+    if (severityFilter) {
+      addAuditLog(`ALERT FILTER: Viewing high-priority ${severityFilter.toUpperCase()} threats.`, 'info', 'INTEL', `FILTER: SEV_${severityFilter.toUpperCase()}`);
+    } else {
+      addAuditLog('ALERT INTELLIGENCE: Viewing global threat ledger.', 'info', 'INTEL', 'QUERY: ALL_EVENTS');
+    }
+  }, [severityFilter, addAuditLog]);
 
   const filteredRows = useMemo(() => {
     if (!severityFilter) return rows;

@@ -18,10 +18,17 @@ import {
   Legend,
 } from 'recharts';
 
+import { useThreats } from '../context/useThreats';
+
 const Dashboard = () => {
   const { user } = useAuth();
+  const { addAuditLog } = useThreats();
 
   const [liveMode, setLiveMode] = useState(true);
+
+  useEffect(() => {
+    addAuditLog('Security Operations Center (SOC) Dashboard initialized.', 'info', 'SYSTEM', 'UI_READY | WEBSOCKET: CONNECTED');
+  }, [addAuditLog]);
   const [soundEnabled, setSoundEnabled] = useState(false);
   const [lastUpdatedAt, setLastUpdatedAt] = useState(null);
 
