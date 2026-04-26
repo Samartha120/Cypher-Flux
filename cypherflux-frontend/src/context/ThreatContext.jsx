@@ -1,9 +1,9 @@
-import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import React, { createContext, useEffect, useMemo, useRef, useState } from 'react';
 import api from '../services/api';
 import { csvHeader, generateThreatEvent, threatToCsvRow } from '../utils/threatSim';
 import { useAuth } from './AuthContext';
 
-const ThreatContext = createContext(null);
+export const ThreatContext = createContext(null);
 
 const randomInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
 
@@ -249,8 +249,3 @@ export const ThreatProvider = ({ children }) => {
   return <ThreatContext.Provider value={value}>{children}</ThreatContext.Provider>;
 };
 
-export const useThreats = () => {
-  const ctx = useContext(ThreatContext);
-  if (!ctx) throw new Error('useThreats must be used within a ThreatProvider');
-  return ctx;
-};

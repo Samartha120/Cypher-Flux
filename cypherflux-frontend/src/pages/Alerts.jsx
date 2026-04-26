@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { Bell } from 'lucide-react';
-import { useThreats } from '../context/ThreatContext';
+import { useThreats } from '../context/useThreats';
 import { Link, useParams } from 'react-router-dom';
 
 const Alerts = () => {

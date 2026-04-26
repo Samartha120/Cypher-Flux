@@ -1,0 +1,11 @@
+{
+  "name": "cypher-flux-root",
+  "version": "1.0.0",
+  "description": "Root management for Cypher-Flux project",
+  "scripts": {
+    "test": "node test/runner.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}

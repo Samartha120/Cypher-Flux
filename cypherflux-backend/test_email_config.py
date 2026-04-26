@@ -24,15 +24,15 @@ def test_config():
     smtp_username = os.environ.get('SMTP_USERNAME', 'NOT SET')
     smtp_password_set = "YES (hidden)" if os.environ.get('SMTP_PASSWORD') else "NOT SET"
     
-    print(f"  ✓ SMTP_HOST: {smtp_host}")
-    print(f"  ✓ SMTP_PORT: {smtp_port}")
-    print(f"  ✓ SMTP_USERNAME: {smtp_username}")
-    print(f"  ✓ SMTP_PASSWORD: {smtp_password_set}")
+    print(f"  [OK] SMTP_HOST: {smtp_host}")
+    print(f"  [OK] SMTP_PORT: {smtp_port}")
+    print(f"  [OK] SMTP_USERNAME: {smtp_username}")
+    print(f"  [OK] SMTP_PASSWORD: {smtp_password_set}")
     
     if smtp_host == 'NOT SET' or smtp_username == 'NOT SET':
-        print("\n  ⚠️  WARNING: Email credentials not fully configured!")
+        print("\n  [WARN] WARNING: Email credentials not fully configured!")
     else:
-        print("\n  ✅ SMTP Configuration looks good!")
+        print("\n  [OK] SMTP Configuration looks good!")
     
     # Check OTP Recipient Emails
     print("\n[2] OTP Recipient Configuration:")
@@ -41,14 +41,14 @@ def test_config():
     
     if otp_recipients.strip():
         recipient_list = [e.strip() for e in otp_recipients.split(',')]
-        print(f"  ✓ OTP_RECIPIENT_EMAILS: {otp_recipients}")
+        print(f"  [OK] OTP_RECIPIENT_EMAILS: {otp_recipients}")
         print(f"\n  Emails that will receive OTP codes:")
         for i, email in enumerate(recipient_list, 1):
             print(f"    {i}. {email}")
-        print(f"\n  ✅ {len(recipient_list)} additional recipient(s) configured!")
+        print(f"\n  [OK] {len(recipient_list)} additional recipient(s) configured!")
     else:
-        print("  ℹ️  OTP_RECIPIENT_EMAILS: NOT SET (Optional)")
-        print("  → OTP will only be sent to user's registration email")
+        print("  [INFO] OTP_RECIPIENT_EMAILS: NOT SET (Optional)")
+        print("  -> OTP will only be sent to user's registration email")
     
     # Simulate what the email service will do
     print("\n[3] Email Service Behavior Simulation:")
@@ -68,9 +68,9 @@ def test_config():
         print(f"    {i}. {email}")
     
     if len(recipients) > 1:
-        print(f"\n  ✅ Total recipients: {len(recipients)} (Primary + {len(recipients)-1} admin/backup)")
+        print(f"\n  [OK] Total recipients: {len(recipients)} (Primary + {len(recipients)-1} admin/backup)")
     else:
-        print(f"\n  ℹ️  Total recipients: {len(recipients)} (Primary only)")
+        print(f"\n  [INFO] Total recipients: {len(recipients)} (Primary only)")
     
     # Summary
     print("\n" + "="*70)
@@ -78,11 +78,11 @@ def test_config():
     print("="*70)
     if smtp_host != 'NOT SET' and smtp_username != 'NOT SET':
         if otp_recipients.strip():
-            print("✅ Ready: OTP will be sent to user email + admin emails from .env")
+            print("[OK] Ready: OTP will be sent to user email + admin emails from .env")
         else:
-            print("✅ Ready: OTP will be sent to user's registration email only")
+            print("[OK] Ready: OTP will be sent to user's registration email only")
     else:
-        print("❌ Email not ready: SMTP credentials missing or incomplete")
+        print("[FAIL] Email not ready: SMTP credentials missing or incomplete")
     
     print("="*70 + "\n")
 

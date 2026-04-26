@@ -1,0 +1,8 @@
+2026-04-16 03:31:15,979 | [IN ] 127.0.0.1 GET /api/dashboard/stats
+2026-04-16 03:31:15,988 | [OUT] [API] 127.0.0.1 GET /api/dashboard/stats -> 401 (8ms)
+2026-04-16 03:31:16,055 | [IN ] 127.0.0.1 GET /api/dashboard/details
+2026-04-16 03:31:16,056 | [OUT] [API] 127.0.0.1 GET /api/dashboard/details -> 401 (1ms)
+2026-04-16 03:31:16,185 | [IN ] 127.0.0.1 OPTIONS /api/notifications
+2026-04-16 03:31:16,186 | [OUT] [API] 127.0.0.1 OPTIONS /api/notifications -> 200 (0ms)
+2026-04-16 03:31:16,190 | [IN ] 127.0.0.1 POST /api/notifications
+2026-04-16 03:31:16,235 | [OUT] [API] 127.0.0.1 POST /api/notifications -> 201 (43ms)

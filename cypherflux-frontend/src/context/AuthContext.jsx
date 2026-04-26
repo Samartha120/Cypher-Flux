@@ -91,7 +91,18 @@ export const AuthProvider = ({ children }) => {
         localStorage.setItem('pendingUsername', data.username);
         return { success: false, requiresVerification: true, username: data.username, msg: data?.msg || 'Verification required' };
       }
-      return { success: false, msg: data?.msg || "Login failed - Connection Error" };
+
+      if (!err.response) {
+        return { success: false, msg: 'Login failed - Backend not reachable' };
+      }
+      if (status === 401) {
+        return { success: false, msg: data?.msg || 'Bad credentials' };
+      }
+      if (status === 400) {
+        return { success: false, msg: data?.msg || 'Invalid login request' };
+      }
+
+      return { success: false, msg: data?.msg || `Login failed (HTTP ${status || 'unknown'})` };
     }
   };
 

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../services/api';
 import { Ban } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { useThreats } from '../context/ThreatContext';
+import { useThreats } from '../context/useThreats';
 
 const BlockedIPs = () => {
   const [blocks, setBlocks] = useState([]);

@@ -1,4 +1,7 @@
-from flask import Flask
+import time
+import logging
+from urllib.parse import parse_qsl, urlencode
+from flask import Flask, g, request
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 from app.config import Config
@@ -8,6 +11,55 @@ from app.models.token_blocklist_model import TokenBlocklist
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
+    app.logger.setLevel(logging.INFO)
+
+    def _should_trace(path: str) -> bool:
+        p = str(path or '')
+        if p.startswith('/static'):
+            return False
+        if p == '/favicon.ico':
+            return False
+        return True
+
+    @app.before_request
+    def _api_request_timer_start():
+        g._request_started_at = time.perf_counter()
+        if _should_trace(request.path):
+            query = request.query_string.decode('utf-8', errors='ignore') if request.query_string else ''
+            full_path = f"{request.path}?{query}" if query else request.path
+            req_line = f"[REQ] {request.remote_addr or '-'} {request.method} {full_path}"
+            print(req_line, flush=True)
+
+    @app.after_request
+    def _log_api_response(response):
+        if _should_trace(request.path):
+            started_at = getattr(g, '_request_started_at', None)
+            duration_ms = None
+            if started_at is not None:
+                duration_ms = int((time.perf_counter() - started_at) * 1000)
+
+            query = request.query_string.decode('utf-8', errors='ignore') if request.query_string else ''
+            if query:
+                pairs = parse_qsl(query, keep_blank_values=True)
+                safe_pairs = []
+                for k, v in pairs:
+                    key = str(k or '')
+                    if key.lower() in {'token', 'access_token', 'authorization', 'auth'}:
+                        safe_pairs.append((key, '***redacted***'))
+                    else:
+                        safe_pairs.append((key, v))
+                safe_query = urlencode(safe_pairs)
+                full_path = f"{request.path}?{safe_query}" if safe_query else request.path
+            else:
+                full_path = request.path
+            line = f"[RES] {request.remote_addr or '-'} {request.method} {full_path} -> {response.status_code}"
+            if duration_ms is not None:
+                line = f"{line} ({duration_ms}ms)"
+
+            # Print explicitly so logs are always visible in terminal output.
+            print(line, flush=True)
+            app.logger.info(line)
+        return response
     
     # Initialize Extensions
     db.init_app(app)

@@ -18,7 +18,7 @@ import { createPortal } from 'react-dom';
 import {
   Flame, AlertTriangle, Activity, ShieldCheck, X, ChevronDown,
 } from 'lucide-react';
-import { useThreats } from '../context/ThreatContext';
+import { useThreats } from '../context/useThreats';
 import api from '../services/api';
 
 // ─── Audio (critical only) ────────────────────────────────────────────────────

@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Bell, ArrowLeft } from 'lucide-react';
-import { useThreats } from '../context/ThreatContext';
+import { useThreats } from '../context/useThreats';
 
 const severityColor = (sev) => {
   const s = String(sev || '').toLowerCase();

@@ -35,7 +35,7 @@ def test_email_service():
     print(f"[SMTP Setup]")
     print(f"  Host: {smtp_host}:{smtp_port}")
     print(f"  Sender: {sender_email}")
-    print(f"  Status: {'✅ Configured' if sender_email and sender_password else '❌ Not configured'}")
+    print(f"  Status: {'[OK] Configured' if sender_email and sender_password else '[FAIL] Not configured'}")
     print()
     
     # Build recipients list (same logic as email_service.py)
@@ -68,14 +68,14 @@ def test_email_service():
     # Simulate sending
     print(f"[Sending Email]")
     if sender_email and sender_password:
-        print(f"  ⏳ Would send via {smtp_host}:{smtp_port}")
-        print(f"  📧 Recipients count: {len(recipients)}")
-        print(f"  ✅ All recipients would receive the same OTP email")
+        print(f"  ... Would send via {smtp_host}:{smtp_port}")
+        print(f"  ... Recipients count: {len(recipients)}")
+        print(f"  [OK] All recipients would receive the same OTP email")
         print()
         print(f"[Result]")
-        print(f"  ✅ SUCCESS: Email would be sent to {len(recipients)} recipient(s)")
+        print(f"  [OK] SUCCESS: Email would be sent to {len(recipients)} recipient(s)")
     else:
-        print(f"  ⚠️  Email credentials not configured")
+        print(f"  [WARN] Email credentials not configured")
         print(f"  OTP would be printed to console instead")
     
     print("\n" + "="*70)

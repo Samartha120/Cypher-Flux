@@ -21,7 +21,7 @@ def test_signup_endpoint():
     # Create app
     app = create_app()
     
-    print("✅ Flask app created successfully")
+    print("[OK] Flask app created successfully")
     
     # Create test client
     client = app.test_client()
@@ -39,18 +39,18 @@ def test_signup_endpoint():
     
     try:
         response = client.post('/signup', json=test_data)
-        print(f"\n✅ Response Status: {response.status_code}")
+        print(f"\n[OK] Response Status: {response.status_code}")
         print(f"Response Body: {response.json}")
         
         if response.status_code == 500:
-            print("\n❌ 500 Error detected!")
+            print("\n[FAIL] 500 Error detected!")
         elif response.status_code == 201:
-            print(f"\n✅ Signup successful!")
+            print(f"\n[OK] Signup successful!")
         else:
             print(f"\nResponse Status: {response.status_code}")
             
     except Exception as e:
-        print(f"❌ Exception: {e}")
+        print(f"[FAIL] Exception: {e}")
         import traceback
         traceback.print_exc()
 
