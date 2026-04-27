@@ -17,3 +17,6 @@ python-dotenv>=1.0.0
 
 # Background scheduler (alert cleanup cron)
 apscheduler>=3.10.4
+
+# Production WSGI server (Render)
+gunicorn>=22.0.0

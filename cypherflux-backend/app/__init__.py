@@ -1,5 +1,6 @@
 import time
 import logging
+import os
 from urllib.parse import parse_qsl, urlencode
 from flask import Flask, g, request
 from flask_cors import CORS
@@ -63,7 +64,16 @@ def create_app():
     
     # Initialize Extensions
     db.init_app(app)
-    CORS(app)
+    cors_origins_raw = str(os.environ.get('CORS_ALLOWED_ORIGINS', '')).strip()
+    if cors_origins_raw:
+        origins = [o.strip() for o in cors_origins_raw.split(',') if o.strip()]
+        if not origins or '*' in origins:
+            CORS(app)
+        else:
+            CORS(app, resources={r"/api/*": {"origins": origins}})
+    else:
+        # Default: allow all origins (development-friendly).
+        CORS(app)
 
     jwt = JWTManager(app)
 

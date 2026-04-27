@@ -1,0 +1,48 @@
+databases:
+  - name: cypherflux-db
+    plan: free
+    databaseName: cypherflux
+    user: cypherflux
+
+services:
+  - type: web
+    name: cypherflux-backend
+    runtime: python
+    plan: free
+    rootDir: cypherflux-backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m gunicorn wsgi:app --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: DATABASE_URL
+        fromDatabase:
+          name: cypherflux-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: FLASK_DEBUG
+        value: "0"
+      - key: AUTO_CREATE_TABLES
+        value: "1"
+
+  - type: web
+    name: cypherflux-frontend
+    runtime: node
+    plan: free
+    rootDir: cypherflux-frontend
+    buildCommand: npm ci && npm run build
+    startCommand: npx serve@14.2.0 -s dist -l $PORT
+    envVars:
+      # Option A (recommended): set VITE_API_BASE_URL to the full backend API base.
+      # Example: https://<your-backend-service>.onrender.com/api
+      - key: VITE_API_BASE_URL
+        value: ""
+      # Option B: set only the backend origin and let the app append /api.
+      # Example: https://<your-backend-service>.onrender.com
+      - key: VITE_BACKEND_ORIGIN
+        value: https://cypherflux-backend.onrender.com
+      - key: NODE_VERSION
+        value: 20.11.1

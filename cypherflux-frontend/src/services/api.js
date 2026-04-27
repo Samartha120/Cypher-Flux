@@ -1,20 +1,32 @@
 import axios from 'axios';
 
 const explicitBase = import.meta.env?.VITE_API_BASE_URL;
-const backendOrigin = import.meta.env?.VITE_BACKEND_ORIGIN || 'http://127.0.0.1:5000';
+const backendOriginEnv = import.meta.env?.VITE_BACKEND_ORIGIN;
+const devBackendOriginFallback = 'http://127.0.0.1:5000';
 const isDev = Boolean(import.meta.env?.DEV);
 
 const normalizeBaseURL = () => {
+  const explicit = explicitBase ? String(explicitBase).trim() : '';
+
   // In development, force absolute backend URL to avoid Vite proxy ECONNREFUSED flakiness.
   if (isDev) {
-    if (!explicitBase) return `${backendOrigin}/api`;
-    const raw = String(explicitBase).trim();
-    if (/^https?:\/\//i.test(raw)) return raw;
+    const backendOrigin = (backendOriginEnv && String(backendOriginEnv).trim()) || devBackendOriginFallback;
+    if (!explicit) return `${backendOrigin}/api`;
+    if (/^https?:\/\//i.test(explicit)) return explicit;
     // Treat relative values like "/api" as backend-relative in dev.
-    return `${backendOrigin}${raw.startsWith('/') ? raw : `/${raw}`}`;
+    return `${backendOrigin}${explicit.startsWith('/') ? explicit : `/${explicit}`}`;
   }
 
-  return explicitBase || '/api';
+  // Production (Render): you usually deploy frontend and backend on different hosts.
+  // Prefer an explicit base (full URL to /api). If only an origin is provided, append /api.
+  if (explicit) return explicit;
+  if (backendOriginEnv && String(backendOriginEnv).trim()) {
+    const origin = String(backendOriginEnv).trim().replace(/\/$/, '');
+    return `${origin}/api`;
+  }
+
+  // Fallback for same-origin deployments (e.g., reverse proxy):
+  return '/api';
 };
 
 const baseURL = normalizeBaseURL();
