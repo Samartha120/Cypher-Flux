@@ -173,3 +173,9 @@ def _start_schedulers(app: Flask) -> None:
     
     scheduler.start()
     logger.info('[Scheduler] APScheduler started: Cleanup (2h), Batch Flush (10s).')
+
+
+# WSGI entrypoint compatibility:
+# Some hosts/docs use `gunicorn app:app`. In this repo, `app` is a package,
+# so we expose a module-level `app` object here.
+app = create_app()

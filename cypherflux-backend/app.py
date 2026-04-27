@@ -1,4 +1,4 @@
-from app import create_app
+from app import app
 from app.models.db import db
 from dotenv import load_dotenv
 from pathlib import Path
@@ -6,8 +6,6 @@ import os
 
 # Load environment from cypherflux-backend/.env regardless of current working directory
 load_dotenv(dotenv_path=Path(__file__).resolve().parent / '.env', override=False)
-
-app = create_app()
 
 def initialize_db():
     with app.app_context():
