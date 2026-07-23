@@ -18,7 +18,8 @@ const Footer = () => {
       borderTop: '1px solid rgba(0, 240, 255, 0.2)',
       borderBottom: 'none', borderLeft: 'none', borderRight: 'none',
       borderRadius: '0',
-      fontSize: '0.85rem'
+      fontSize: '0.85rem',
+      tabSize: '4',
     }}>
       {/* Left Block */}
       <div style={{ display: 'flex', flexDirection: 'column' }}>
